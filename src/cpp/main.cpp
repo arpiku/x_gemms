@@ -3,6 +3,8 @@
 #include <cstring>
 #include <cmath>
 #include <algorithm>
+#include <vector>
+#include <cstdlib>
 #include "basic/naive.cpp"
 #include "basic/blocked.cpp"
 #include "basic/cache_aware.cpp"
@@ -174,9 +176,45 @@ void print_results(const char* name, size_t N, double time_ms) {
 }
 
 int main(int argc, char* argv[]) {
-    size_t sizes[] = {64, 128, 256, 512, 1024};
-    int num_threads = argc > 1 ? std::atoi(argv[1]) : 0;
-
+    // Default sizes (MEDIUM_SIZES from config)
+    std::vector<size_t> default_sizes = {64, 128, 256, 512, 1024, 2048};
+    
+    // Parse arguments
+    // Usage: ./gemm_bench <num_threads> [sizes...]
+    // Example: ./gemm_bench 20 64 128 256 512 1024 2048
+    
+    int num_threads = 0;
+    std::vector<size_t> sizes;
+    bool sizes_provided = false;
+    
+    // First arg is num_threads if it's a number
+    int arg_idx = 1;
+    if (argc > 1) {
+        // Check if first arg is a number (thread count)
+        char* endptr;
+        long threads = strtol(argv[1], &endptr, 10);
+        if (endptr != argv[1] && *endptr == '\0') {
+            num_threads = (int)threads;
+            arg_idx = 2;
+        }
+    }
+    
+    // Remaining args are sizes
+    for (int i = arg_idx; i < argc; i++) {
+        char* endptr;
+        long size = strtol(argv[i], &endptr, 10);
+        if (endptr != argv[i] && *endptr == '\0' && size > 0) {
+            sizes.push_back((size_t)size);
+            sizes_provided = true;
+        }
+    }
+    
+    // If no sizes provided, use default and note it
+    if (!sizes_provided) {
+        sizes = default_sizes;
+        std::cerr << "INFO: No sizes provided, using default MEDIUM_SIZES (64,128,256,512,1024,2048)" << std::endl;
+    }
+    
     std::cout << "algorithm,size,time_ms,gfops,bandwidth_gbs" << std::endl;
 
     for (size_t N : sizes) {

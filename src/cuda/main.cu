@@ -3,6 +3,8 @@
 #include <cstdio>
 #include <cstdlib>
 #include <ctime>
+#include <vector>
+#include <cstdlib>
 
 __global__ void gemm_naive_kernel(const float* A, const float* B, float* C, int N) {
     int row = blockIdx.y * blockDim.y + threadIdx.y;
@@ -99,8 +101,31 @@ void print_results(const char* name, int N, double time_ms) {
 }
 
 int main(int argc, char* argv[]) {
-    int sizes[] = {64, 128, 256, 512, 1024};
-
+    // Default sizes (MEDIUM_SIZES from config)
+    std::vector<int> default_sizes = {64, 128, 256, 512, 1024, 2048};
+    
+    // Parse arguments
+    // Usage: ./gpu_bench [sizes...]
+    // Example: ./gpu_bench 64 128 256 512 1024 2048
+    
+    std::vector<int> sizes;
+    bool sizes_provided = false;
+    
+    for (int i = 1; i < argc; i++) {
+        char* endptr;
+        long size = strtol(argv[i], &endptr, 10);
+        if (endptr != argv[i] && *endptr == '\0' && size > 0) {
+            sizes.push_back((int)size);
+            sizes_provided = true;
+        }
+    }
+    
+    // If no sizes provided, use default
+    if (!sizes_provided) {
+        sizes = default_sizes;
+        fprintf(stderr, "INFO: No sizes provided, using default MEDIUM_SIZES (64,128,256,512,1024,2048)\n");
+    }
+    
     printf("algorithm,size,time_ms,gfops,bandwidth_gbs\n");
 
     for (int N : sizes) {
