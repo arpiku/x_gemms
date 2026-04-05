@@ -150,6 +150,14 @@ WARMUP_ITERATIONS: int = 3
 BENCHMARK_ITERATIONS: int = 10
 
 # =============================================================================
+# Strassen Algorithm Configuration
+# =============================================================================
+
+STRASSEN_CROSSOVER_THRESHOLD: int = 64
+STRASSEN_MAX_DEPTH: int = 10
+STRASSEN_PAD_STRATEGY: str = "even"
+
+# =============================================================================
 # Memory Bandwidth Reference (theoretical max)
 # =============================================================================
 
