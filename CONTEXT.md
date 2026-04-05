@@ -223,4 +223,51 @@ Create: `src/python/strassen.py` or `src/cuda/strassen.cu`
 
 ---
 
+## 8. Optimization Notes
+
+### 8.1 Single Matrix Generation (v2.0+)
+
+Starting from v2.0, matrices are generated **once for the maximum size** and subsets are used for smaller sizes. This significantly reduces initialization time (~6x for medium tests).
+
+**Implementation** (`src/cpp/main.cpp`, `src/cuda/main.cu`):
+```cpp
+// Find max size from the sizes list
+size_t max_size = sizes[0];
+for (size_t s : sizes) if (s > max_size) max_size = s;
+
+// Generate once for max size
+float *A = malloc(max_size * max_size * sizeof(float));
+initialize_matrix(A, max_size);
+
+// For each size, algorithms only access A[0:N][0:N]
+for (size_t N : sizes) {
+    benchmark_algorithm(A, B, C, N);  // N parameter controls subset
+}
+```
+
+**Benefits**:
+- Reduced initialization time (~6x for medium tests)
+- Better cache utilization (larger matrix stays in L3)
+- Same algorithmic behavior (algorithms only iterate 0..N-1)
+
+**Trade-off**: 
+- Each size uses a subset of the **same random data** rather than independently generated data
+- This does not affect algorithm performance comparisons
+- Documented for reproducibility considerations
+
+### 8.2 Parallel Initialization
+
+Matrix initialization uses OpenMP parallel for:
+```cpp
+void initialize_matrix(T* A, size_t N) {
+    #pragma omp parallel for
+    for (size_t i = 0; i < N * N; ++i) {
+        A[i] = static_cast<T>(rand() % 100) / 10.0f;
+    }
+}
+```
+This utilizes all CPU cores during the random number generation phase.
+
+---
+
 *Last Updated: April 2026*

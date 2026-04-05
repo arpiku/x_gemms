@@ -67,6 +67,7 @@ void gemm_cublas(const float* A, const float* B, float* C, int N) {
 }
 
 void initialize_matrix(float* A, int N) {
+    #pragma omp parallel for
     for (int i = 0; i < N * N; ++i) {
         A[i] = static_cast<float>(rand() % 100) / 10.0f;
     }
@@ -128,24 +129,33 @@ int main(int argc, char* argv[]) {
     
     printf("algorithm,size,time_ms,gfops,bandwidth_gbs\n");
 
-    for (int N : sizes) {
-        float *A = (float*)malloc(N * N * sizeof(float));
-        float *B = (float*)malloc(N * N * sizeof(float));
-        float *C = (float*)malloc(N * N * sizeof(float));
+    // OPTIMIZATION: Generate matrices once for MAX size, use subsets for smaller sizes
+    int max_size = sizes[0];
+    for (int s : sizes) {
+        if (s > max_size) max_size = s;
+    }
+    
+    float *A = (float*)malloc(max_size * max_size * sizeof(float));
+    float *B = (float*)malloc(max_size * max_size * sizeof(float));
+    float *C = (float*)malloc(max_size * max_size * sizeof(float));
+    
+    initialize_matrix(A, max_size);
+    initialize_matrix(B, max_size);
 
-        initialize_matrix(A, N);
-        initialize_matrix(B, N);
+    for (int N : sizes) {
+        // Matrices already allocated for max_size, use subset for each N
 
         double time = benchmark_function(gemm_cuda_naive, A, B, C, N);
         print_results("cuda_naive", N, time);
 
         time = benchmark_function(gemm_cublas, A, B, C, N);
         print_results("cublas", N, time);
-
-        free(A);
-        free(B);
-        free(C);
     }
+
+    // Free matrices after all sizes are processed
+    free(A);
+    free(B);
+    free(C);
 
     return 0;
 }

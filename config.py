@@ -24,13 +24,64 @@ ALL_SIZES: List[int] = [
 ]
 
 # Sizes for quick tests (subset of ALL_SIZES)
-QUICK_SIZES: List[int] = [64, 128, 256, 512, 1024]
+# Note: N=1024+ is too slow for single-thread Python, use 512 max for quick
+QUICK_SIZES: List[int] = [64, 128, 256, 512]
 
-# Sizes for medium tests (excludes very large, good for development)
-MEDIUM_SIZES: List[int] = [64, 128, 256, 512, 1024, 2048, 4096, 8192]
+# Sizes for medium tests
+# Python: max 512 (numba too slow), C++/GPU: up to 2048
+MEDIUM_SIZES_PYTHON: List[int] = [64, 128, 256, 512]
+MEDIUM_SIZES_CPP: List[int] = [64, 128, 256, 512, 1024, 2048]
+MEDIUM_SIZES: List[int] = MEDIUM_SIZES_CPP  # Default for binary execution
+
+# All sizes for full benchmark run
+ALL_SIZES: List[int] = [
+    64, 128, 256, 512, 1024,
+    2048, 4096, 8192,
+    10000, 15000, 20000,
+]
+
+# =============================================================================
+# Size Limits (to prevent hanging on slow algorithms)
+# =============================================================================
+
+SINGLE_THREAD_MAX_SIZE: int = 2048  # Max size for naive/Numba/single-thread algos
+PARALLEL_MAX_SIZE: int = 8192       # Max size for parallel algorithms (openmp, etc.)
+FORCE_LARGE_SIZES: bool = False     # Override to allow all sizes (dangerous!)
 
 # Timeout per benchmark in seconds (prevents hanging on large sizes)
-BENCHMARK_TIMEOUT_SECONDS: int = 120  # 2 minutes max per test
+BENCHMARK_TIMEOUT_SECONDS: int = 600
+
+
+# =============================================================================
+# Helper Functions
+# =============================================================================
+
+def get_sizes_for_test(quick: bool = False, medium: bool = False, large: bool = False) -> List[int]:
+    """
+    Get sizes for test based on mode.
+    
+    Args:
+        quick: Use QUICK_SIZES (64, 128, 256, 512)
+        medium: Use MEDIUM_SIZES (64-2048)
+        large: Use ALL_SIZES (up to 20000)
+    
+    Returns:
+        List of sizes to benchmark
+    """
+    if large:
+        return ALL_SIZES
+    elif medium:
+        return MEDIUM_SIZES
+    elif quick:
+        return QUICK_SIZES
+    else:
+        # Default to MEDIUM_SIZES if nothing specified
+        return MEDIUM_SIZES
+
+
+def get_default_sizes() -> List[int]:
+    """Get default sizes (MEDIUM_SIZES)."""
+    return MEDIUM_SIZES
 
 # =============================================================================
 # Data Types
@@ -70,7 +121,11 @@ SUPPORTED_DTYPES: Dict[str, Dict[str, bool]] = {
 # CPU Configuration
 # =============================================================================
 
-DEFAULT_CPU_THREADS: int = 8
+import os
+
+MAX_CPU_THREADS: int = os.cpu_count() or 8  # Auto-detect max available cores
+DEFAULT_CPU_THREADS: int = MAX_CPU_THREADS  # Use max cores by default
+CPU_THREADS_CONFIG: int = DEFAULT_CPU_THREADS  # Configurable thread count (used by CLI)
 CPU_AVX512_SUPPORTED: bool = False  # Set based on runtime CPU detection
 
 # =============================================================================

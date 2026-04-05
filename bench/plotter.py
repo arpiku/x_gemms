@@ -18,6 +18,9 @@ except ImportError:
 
 RESULTS_DIR = Path(__file__).parent.parent / "results"
 
+# Create results directory if it doesn't exist
+RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+
 
 def load_results(csv_file: str = "benchmarks.csv") -> list[dict]:
     """Load benchmark results from CSV file."""
@@ -53,6 +56,32 @@ COLORS = {
 }
 
 
+# Enhanced color palette - unique colors per algorithm
+ALGORITHM_COLORS = {
+    # CPU Single-thread
+    'CPU-Naive-Cpp': '#E63946',      # Red
+    'CPU-Naive-Numba-Python': '#FF6B6B',  # Light Red
+    'CPU-Naive-NumPy-Python': '#FF8FA3',  # Pink
+    'CPU-SIMD-SSE-Cpp': '#2A9D8F',   # Teal
+    'CPU-SIMD-AVX2-Cpp': '#264653',  # Dark Teal
+    'CPU-SIMD-AVX512-Cpp': '#A8DADC', # Light Teal
+    'CPU-Blocked-Cpp': '#457B9D',    # Blue
+    'CPU-Parallel-OpenMP-Cpp': '#F4A261',  # Orange
+    'CPU-Parallel-OpenMP-Cpp-Blocked': '#E76F51',  # Burnt Orange
+    'CPU-Parallel-StdThread-Cpp': '#E9C46A',  # Yellow
+    # GPU
+    'GPU-CUDA-Cpp': '#6D597A',      # Purple
+    'GPU-CUDA-cuBLAS-Cpp': '#B56576', # Magenta
+    'GPU-CUDA-CUTLASS-Cpp': '#C9B1FF', # Light Purple
+    # Tensor Core
+    'GPU-TensorCore-PyTorch-fp16-Python': '#00F5D4',  # Cyan
+    'GPU-TensorCore-PyTorch-bf16-Python': '#00BBF9',  # Light Blue
+    # Sparse
+    'CPU-Sparse-SciPy-Python': '#9B5DE5',  # Violet
+    'GPU-Sparse-PyTorch-Python': '#F15BB5',  # Pink
+}
+
+
 def plot_gflops_by_size(
     results: list[dict],
     output_file: str = "gflops_by_size.png",
@@ -71,34 +100,34 @@ def plot_gflops_by_size(
         modules[key]["sizes"].append(int(r["size"]))
         modules[key]["gfops"].append(float(r["gfops"]))
 
-    fig, ax = plt.subplots(figsize=(12, 8))
+    fig, ax = plt.subplots(figsize=(14, 10))
     
     for name, data in modules.items():
         sorted_idx = np.argsort(data["sizes"])
-        category = data["category"]
-        color = COLORS.get(category, '#333333')
+        # Use unique color per algorithm, fallback to category color
+        color = ALGORITHM_COLORS.get(name, COLORS.get(data["category"], '#333333'))
         ax.plot(
             np.array(data["sizes"])[sorted_idx],
             np.array(data["gfops"])[sorted_idx],
             marker="o",
             label=name,
             color=color,
-            linewidth=2,
-            markersize=6
+            linewidth=2.5,
+            markersize=8
         )
 
-    ax.set_xlabel("Matrix Size (N)", fontsize=12)
-    ax.set_ylabel("GFLOPS", fontsize=12)
-    ax.set_title(title, fontsize=14, fontweight='bold')
-    ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left', fontsize=8)
+    ax.set_xlabel("Matrix Size (N)", fontsize=16)
+    ax.set_ylabel("GFLOPS", fontsize=16)
+    ax.set_title(title, fontsize=18, fontweight='bold', pad=20)
+    ax.legend(loc='upper left', fontsize=9, framealpha=0.9, ncol=2)
     ax.set_xscale("log")
     ax.set_yscale("log")
     ax.grid(True, alpha=0.3, which="both")
-    ax.tick_params(axis='both', labelsize=10)
+    ax.tick_params(axis='both', labelsize=12)
 
     plt.tight_layout()
     output_path = RESULTS_DIR / output_file
-    plt.savefig(output_path, dpi=150, bbox_inches='tight')
+    plt.savefig(output_path, dpi=300, bbox_inches='tight')
     plt.close()
     return str(output_path)
 
@@ -120,19 +149,18 @@ def plot_bandwidth_by_size(
         modules[key]["sizes"].append(int(r["size"]))
         modules[key]["bandwidth"].append(float(r["bandwidth_gbs"]))
 
-    fig, ax = plt.subplots(figsize=(12, 8))
+    fig, ax = plt.subplots(figsize=(14, 10))
     for name, data in modules.items():
         sorted_idx = np.argsort(data["sizes"])
-        category = data["category"]
-        color = COLORS.get(category, '#333333')
+        color = ALGORITHM_COLORS.get(name, COLORS.get(data["category"], '#333333'))
         ax.plot(
             np.array(data["sizes"])[sorted_idx],
             np.array(data["bandwidth"])[sorted_idx],
             marker="s",
             label=name,
             color=color,
-            linewidth=2,
-            markersize=6
+            linewidth=2.5,
+            markersize=8
         )
 
     # Add theoretical bandwidth reference lines
@@ -140,6 +168,19 @@ def plot_bandwidth_by_size(
                label='RTX 5070 Peak (~500 GB/s)')
     ax.axhline(y=50, color='#FF8C00', linestyle='--', linewidth=2, alpha=0.7,
                label='CPU DDR5 per channel (~50 GB/s)')
+
+    ax.set_xlabel("Matrix Size (N)", fontsize=16)
+    ax.set_ylabel("Bandwidth (GB/s)", fontsize=16)
+    ax.set_title(title, fontsize=18, fontweight='bold', pad=20)
+    ax.legend(loc='upper left', fontsize=9, framealpha=0.9, ncol=2)
+    ax.set_xscale("log")
+    ax.grid(True, alpha=0.3, which="both")
+    ax.tick_params(axis='both', labelsize=12)
+
+    plt.tight_layout()
+    output_path = RESULTS_DIR / output_file
+    plt.savefig(output_path, dpi=300, bbox_inches='tight')
+    plt.close()
 
     ax.set_xlabel("Matrix Size (N)", fontsize=12)
     ax.set_ylabel("Bandwidth (GB/s)", fontsize=12)
@@ -172,33 +213,33 @@ def plot_timing_linear(
         modules[key]["sizes"].append(int(r["size"]))
         modules[key]["time_ms"].append(float(r["time_ms"]))
 
-    fig, ax = plt.subplots(figsize=(14, 8))
+    fig, ax = plt.subplots(figsize=(14, 10))
     
     for name, data in modules.items():
         sorted_idx = np.argsort(data["sizes"])
-        category = data["category"]
-        color = COLORS.get(category, '#333333')
+        color = ALGORITHM_COLORS.get(name, COLORS.get(data["category"], '#333333'))
         ax.plot(
             np.array(data["sizes"])[sorted_idx],
             np.array(data["time_ms"])[sorted_idx],
             marker="o",
             label=name,
             color=color,
-            linewidth=2,
-            markersize=6
+            linewidth=2.5,
+            markersize=8
         )
 
-    ax.set_xlabel("Matrix Size (N)", fontsize=12)
-    ax.set_ylabel("Time (ms)", fontsize=12)
-    ax.set_title(title, fontsize=14, fontweight='bold')
-    ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left', fontsize=7)
+    ax.set_xlabel("Matrix Size (N)", fontsize=16)
+    ax.set_ylabel("Time (ms)", fontsize=16)
+    ax.set_title(title, fontsize=18, fontweight='bold', pad=20)
+    ax.legend(loc='upper left', fontsize=9, framealpha=0.9, ncol=2)
     ax.set_xscale("linear")
     ax.set_yscale("linear")
     ax.grid(True, alpha=0.3)
+    ax.tick_params(axis='both', labelsize=12)
     
     plt.tight_layout()
     output_path = RESULTS_DIR / output_file
-    plt.savefig(output_path, dpi=150, bbox_inches='tight')
+    plt.savefig(output_path, dpi=300, bbox_inches='tight')
     plt.close()
     return str(output_path)
 
@@ -300,7 +341,7 @@ def plot_sparse_comparison(
         formats[fmt]["sizes"].append(int(r["size"]))
         formats[fmt]["gfops"].append(float(r["gfops"]))
 
-    fig, ax = plt.subplots(figsize=(10, 6))
+    fig, ax = plt.subplots(figsize=(12, 8))
     for fmt, data in formats.items():
         sorted_idx = np.argsort(data["sizes"])
         ax.plot(
@@ -308,15 +349,17 @@ def plot_sparse_comparison(
             np.array(data["gfops"])[sorted_idx],
             marker='o',
             label=fmt,
-            linewidth=2
+            linewidth=2.5,
+            markersize=8
         )
 
-    ax.set_xlabel("Matrix Size (N)", fontsize=12)
-    ax.set_ylabel("GFLOPS", fontsize=12)
-    ax.set_title(title, fontsize=14, fontweight='bold')
-    ax.legend()
+    ax.set_xlabel("Matrix Size (N)", fontsize=14)
+    ax.set_ylabel("GFLOPS", fontsize=14)
+    ax.set_title(title, fontsize=16, fontweight='bold', pad=15)
+    ax.legend(loc='upper left', fontsize=10, framealpha=0.9)
     ax.set_xscale("log")
     ax.grid(True, alpha=0.3)
+    ax.tick_params(axis='both', labelsize=11)
 
     plt.tight_layout()
     output_path = RESULTS_DIR / output_file
@@ -350,7 +393,7 @@ def plot_tensor_core_comparison(
             bf16_data["sizes"].append(int(r["size"]))
             bf16_data["gfops"].append(float(r["gfops"]))
 
-    fig, ax = plt.subplots(figsize=(10, 6))
+    fig, ax = plt.subplots(figsize=(12, 8))
     
     if fp16_data["sizes"]:
         sorted_idx = np.argsort(fp16_data["sizes"])
@@ -359,8 +402,8 @@ def plot_tensor_core_comparison(
             np.array(fp16_data["gfops"])[sorted_idx],
             marker='o',
             label='FP16',
-            linewidth=2,
-            color='#E63946'
+            linewidth=2.5,
+            color='#00F5D4'
         )
     
     if bf16_data["sizes"]:
@@ -370,21 +413,22 @@ def plot_tensor_core_comparison(
             np.array(bf16_data["gfops"])[sorted_idx],
             marker='s',
             label='BF16',
-            linewidth=2,
-            color='#457B9D'
+            linewidth=2.5,
+            color='#00BBF9'
         )
 
-    ax.set_xlabel("Matrix Size (N)", fontsize=12)
-    ax.set_ylabel("GFLOPS", fontsize=12)
-    ax.set_title(title, fontsize=14, fontweight='bold')
-    ax.legend()
+    ax.set_xlabel("Matrix Size (N)", fontsize=14)
+    ax.set_ylabel("GFLOPS", fontsize=14)
+    ax.set_title(title, fontsize=16, fontweight='bold', pad=15)
+    ax.legend(loc='upper left', fontsize=11, framealpha=0.9)
     ax.set_xscale("log")
     ax.set_yscale("log")
     ax.grid(True, alpha=0.3)
+    ax.tick_params(axis='both', labelsize=11)
 
     plt.tight_layout()
     output_path = RESULTS_DIR / output_file
-    plt.savefig(output_path, dpi=150, bbox_inches='tight')
+    plt.savefig(output_path, dpi=300, bbox_inches='tight')
     plt.close()
     return str(output_path)
 

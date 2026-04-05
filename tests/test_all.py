@@ -44,26 +44,80 @@ def parse_csv_results(csv_output: str) -> list[dict]:
 
 
 def get_backend_label(algorithm: str, module: str = "") -> str:
-    """Get backend label for an algorithm."""
+    """Get backend label for an algorithm using new naming convention."""
     alg_lower = algorithm.lower()
     mod_lower = module.lower()
     
-    if 'tensor_core' in alg_lower or 'matmul' in alg_lower:
-        return "GPU TensorCore"
-    elif 'cublas' in alg_lower or 'cuda' in alg_lower:
-        return "CUDA"
+    # New naming: (Device)-(Implementation)-(Library)-(Language)
+    if 'tensor_core' in alg_lower:
+        if 'fp16' in alg_lower:
+            return "GPU-TensorCore-PyTorch-fp16-Python"
+        elif 'bf16' in alg_lower:
+            return "GPU-TensorCore-PyTorch-bf16-Python"
+        return "GPU-TensorCore-PyTorch-Python"
+    elif 'cublas' in alg_lower:
+        return "GPU-CUDA-cuBLAS-Cpp"
+    elif 'cutlass' in alg_lower:
+        return "GPU-CUDA-CUTLASS-Cpp"
+    elif 'cuda' in alg_lower:
+        return "GPU-CUDA-Cpp"
     elif 'openmp' in alg_lower and 'blocked' in alg_lower:
-        threads = getattr(config, 'DEFAULT_CPU_THREADS', 8)
-        return f"CPU multi-core ({threads} threads)"
-    elif 'openmp' in alg_lower or 'thread' in alg_lower or 'std' in alg_lower:
-        threads = getattr(config, 'DEFAULT_CPU_THREADS', 8)
-        return f"CPU multi-core ({threads} threads)"
-    elif any(x in alg_lower for x in ['sse', 'avx', 'naive', 'blocked', 'cache']):
-        return "CPU single-core"
-    elif 'sparse' in mod_lower:
-        return "GPU Sparse"
+        return "CPU-Parallel-OpenMP-Cpp-Blocked"
+    elif 'openmp' in alg_lower:
+        return "CPU-Parallel-OpenMP-Cpp"
+    elif 'std_thread' in alg_lower or 'std' in alg_lower:
+        return "CPU-Parallel-StdThread-Cpp"
+    elif 'avx512' in alg_lower:
+        return "CPU-SIMD-AVX512-Cpp"
+    elif 'avx2' in alg_lower:
+        return "CPU-SIMD-AVX2-Cpp"
+    elif 'sse' in alg_lower:
+        return "CPU-SIMD-SSE-Cpp"
+    elif 'blocked' in alg_lower or 'cache_aware' in alg_lower:
+        return "CPU-Blocked-Cpp"
+    elif 'naive' in alg_lower:
+        if mod_lower == 'reference' or mod_lower == 'numba' or mod_lower == 'python':
+            return "CPU-Naive-Numba-Python"
+        return "CPU-Naive-Cpp"
+    elif 'numpy' in alg_lower:
+        return "CPU-Naive-NumPy-Python"
+    elif 'sparse' in mod_lower or 'sparse' in alg_lower:
+        if 'gpu' in mod_lower or 'cuda' in alg_lower:
+            return "GPU-Sparse-PyTorch-Python"
+        return "CPU-Sparse-SciPy-Python"
     else:
-        return "CPU single-core"
+        return "CPU-Naive-Cpp"
+
+
+def should_skip_size(algorithm: str, size: int) -> tuple[bool, str]:
+    """Check if algorithm should be skipped for given size."""
+    if config.FORCE_LARGE_SIZES:
+        return False, ""
+    
+    alg_lower = algorithm.lower()
+    
+    # Single-thread algorithms: limit to SINGLE_THREAD_MAX_SIZE
+    single_thread_algos = ['naive', 'sse', 'avx2', 'avx512', 'blocked', 'cache_aware', 
+                           'numpy', 'numba', 'reference']
+    is_parallel = any(x in alg_lower for x in ['openmp', 'std_thread', 'thread'])
+    is_gpu = any(x in alg_lower for x in ['cuda', 'tensor_core', 'cublas', 'cutlass', 'sparse_gpu'])
+    is_tensor_core = 'tensor_core' in alg_lower
+    
+    if is_gpu or is_tensor_core:
+        # GPU/TensorCore: up to PARALLEL_MAX_SIZE
+        if size > config.PARALLEL_MAX_SIZE:
+            return True, f"size > {config.PARALLEL_MAX_SIZE} for GPU"
+        return False, ""
+    elif is_parallel:
+        # Parallel CPU: up to PARALLEL_MAX_SIZE
+        if size > config.PARALLEL_MAX_SIZE:
+            return True, f"size > {config.PARALLEL_MAX_SIZE} for parallel CPU"
+        return False, ""
+    else:
+        # Single-thread: up to SINGLE_THREAD_MAX_SIZE
+        if size > config.SINGLE_THREAD_MAX_SIZE:
+            return True, f"size > {config.SINGLE_THREAD_MAX_SIZE} for single-thread"
+        return False, ""
 
 
 def test_reference(sizes=None, dtypes=None):
@@ -75,18 +129,29 @@ def test_reference(sizes=None, dtypes=None):
     if dtypes is None:
         dtypes = ["fp32"]
     
-    # Skip very large sizes for reference (too slow)
-    sizes = [s for s in sizes if s <= 4096]
+    # Filter sizes based on algorithm type
+    filtered_sizes = []
+    for size in sizes:
+        skip, reason = should_skip_size("numba", size)
+        if skip:
+            print(f"  [N={size}] CPU-Naive-Numba-Python -> Skipping ({reason})")
+        else:
+            filtered_sizes.append(size)
+    
+    if not filtered_sizes:
+        return []
     
     results = []
-    for size in sizes:
+    for size in filtered_sizes:
         for dtype in dtypes:
-            print(f"  [N={size}, dtype={dtype}] CPU single-core", end=" ", flush=True)
+            label = "CPU-Naive-Numba-Python"
+            print(f"  [N={size}, dtype={dtype}] {label}", end=" ", flush=True)
             try:
                 # Try Numba first, fall back to NumPy
                 r = run_numba_benchmarks([size], [dtype])
                 if not r:
                     r = run_numpy_benchmarks([size], [dtype])
+                    label = "CPU-Naive-NumPy-Python"
                 if r:
                     result = r[0]
                     print(f"-> {result['gfops']:.2f} GFLOPS")
@@ -109,18 +174,45 @@ def test_cpp(sizes=None):
         print(f"  C++ binary not found: {cpp_binary}")
         return []
     
-    print(f"  Running with {config.DEFAULT_CPU_THREADS} threads...")
+    # Use provided sizes or default to MEDIUM_SIZES
+    if sizes is None:
+        sizes = config.get_default_sizes()
+    
+    # Filter sizes based on parallel vs single-thread limits
+    filtered_sizes = []
+    for size in sizes:
+        skip, reason = should_skip_size("openmp", size)  # Check with parallel algo
+        if skip:
+            print(f"  [N={size}] Skipping for single-thread ({reason})")
+        else:
+            filtered_sizes.append(size)
+    
+    if not filtered_sizes:
+        print("  No sizes to run after filtering")
+        return []
+    
+    # Build command: gemm_bench <threads> <sizes...>
+    cmd = [str(cpp_binary), str(config.DEFAULT_CPU_THREADS)] + [str(s) for s in filtered_sizes]
+    print(f"  Running with {config.DEFAULT_CPU_THREADS} threads, sizes: {filtered_sizes}")
     
     try:
         result = subprocess.run(
-            [str(cpp_binary), str(config.DEFAULT_CPU_THREADS)],
+            cmd,
             capture_output=True,
             text=True,
-            timeout=300,  # 5 min timeout for C++ tests
+            timeout=600,  # 10 min timeout for C++ tests
             cwd=Path(__file__).parent.parent
         )
         if result.returncode == 0:
-            return parse_csv_results(result.stdout)
+            # Check for INFO message about default sizes
+            if "INFO: No sizes provided" in result.stderr:
+                print(f"  Note: C++ defaulted to MEDIUM_SIZES (no sizes passed)")
+            
+            cpp_results = parse_csv_results(result.stdout)
+            for r in cpp_results:
+                backend = get_backend_label(r['algorithm'], r['module'])
+                print(f"  [N={r['size']}] {backend} -> {r['gfops']:.2f} GFLOPS")
+            return cpp_results
         else:
             print(f"  C++ benchmark failed: {result.stderr[:100]}")
             return []
@@ -132,7 +224,7 @@ def test_cpp(sizes=None):
         return []
 
 
-def test_gpu():
+def test_gpu(sizes=None):
     """Test GPU implementations via CUDA binary."""
     print("\n[Module: GPU/CUDA]")
     
@@ -141,15 +233,27 @@ def test_gpu():
         print(f"  GPU binary not found: {gpu_binary}")
         return []
     
+    # Use provided sizes or default to MEDIUM_SIZES
+    if sizes is None:
+        sizes = config.get_default_sizes()
+    
+    # Build command: gpu_bench <sizes...>
+    cmd = [str(gpu_binary)] + [str(s) for s in sizes]
+    print(f"  Running with sizes: {sizes}")
+    
     try:
         result = subprocess.run(
-            [str(gpu_binary)],
+            cmd,
             capture_output=True,
             text=True,
-            timeout=300,
+            timeout=600,
             cwd=Path(__file__).parent.parent
         )
         if result.returncode == 0:
+            # Check for INFO message about default sizes
+            if "INFO: No sizes provided" in result.stderr:
+                print(f"  Note: CUDA defaulted to MEDIUM_SIZES (no sizes passed)")
+            
             results = parse_csv_results(result.stdout)
             for r in results:
                 backend = get_backend_label(r['algorithm'], r['module'])
@@ -276,31 +380,38 @@ def test_all(
     print("GEMM BENCHMARK SUITE")
     print("=" * 60)
     
+    # For Python (NumPy/Numba): always use QUICK_SIZES (512 max) - too slow for larger
+    # For C++/GPU: use provided sizes or default to MEDIUM_SIZES
     if large_sizes:
-        sizes = config.ALL_SIZES
+        cpp_sizes = config.ALL_SIZES
+        python_sizes = config.QUICK_SIZES  # Still capped at 512 for Python
     else:
-        sizes = sizes or config.QUICK_SIZES
+        # Default sizes for binary execution (C++/GPU)
+        cpp_sizes = sizes or config.MEDIUM_SIZES_CPP
+        # Python reference always uses QUICK_SIZES (too slow otherwise)
+        python_sizes = config.QUICK_SIZES
     
-    print(f"Matrix sizes: {sizes}")
+    print(f"Matrix sizes (C++/GPU): {cpp_sizes}")
+    print(f"Matrix sizes (Python): {python_sizes}")
     print(f"Timeout per test: {BENCHMARK_TIMEOUT}s")
     print()
     
     all_results = []
     
-    # Reference (CPU NumPy/Numba)
-    all_results.extend(test_reference(sizes, dtypes))
+    # Reference (CPU NumPy/Numba) - uses Python sizes (capped at 512)
+    all_results.extend(test_reference(python_sizes, dtypes))
     
     # C++ CPU benchmarks
     if run_cpp:
-        all_results.extend(test_cpp(sizes))
+        all_results.extend(test_cpp(cpp_sizes))
     
     # GPU CUDA benchmarks
     if run_gpu:
-        all_results.extend(test_gpu())
+        all_results.extend(test_gpu(cpp_sizes))
     
     # CUTLASS Tensor Core benchmarks
     if run_cutlass:
-        all_results.extend(test_cutlass(sizes, dtypes))
+        all_results.extend(test_cutlass(cpp_sizes, dtypes))
     
     # Sparse matrix benchmarks
     if run_sparse:

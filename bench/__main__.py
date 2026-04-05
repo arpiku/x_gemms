@@ -13,11 +13,13 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  python -m bench run --quick       Run quick benchmarks (sizes 64-1024)
-  python -m bench run --medium      Run medium benchmarks (up to N=8192)
-  python -m bench run --large       Run full benchmarks (up to N=20000)
-  python -m bench plot              Generate plots from results
-  python -m bench                   Show this help
+  python -m bench run --quick              Run quick benchmarks (sizes 64-1024)
+  python -m bench run --medium             Run medium benchmarks (up to N=2048)
+  python -m bench run --large              Run full benchmarks (up to N=20000)
+  python -m bench run --quick --threads 4  Run with 4 CPU threads
+  python -m bench run --medium --force     Force run all sizes (may hang!)
+  python -m bench plot                     Generate plots from results
+  python -m bench                          Show this help
         """
     )
     
@@ -26,8 +28,10 @@ Examples:
     # run subcommand
     run_parser = subparsers.add_parser("run", help="Run benchmarks")
     run_parser.add_argument("--quick", action="store_true", help="Quick benchmarks (sizes 64-1024)")
-    run_parser.add_argument("--medium", action="store_true", help="Medium benchmarks (up to N=8192)")
+    run_parser.add_argument("--medium", action="store_true", help="Medium benchmarks (up to N=2048)")
     run_parser.add_argument("--large", action="store_true", help="Full benchmarks (up to N=20000)")
+    run_parser.add_argument("--threads", type=int, default=None, help="Number of CPU threads for C++ benchmarks")
+    run_parser.add_argument("--force", action="store_true", help="Force run all sizes (dangerous - may hang!)")
     run_parser.add_argument("--no-cpp", action="store_true", help="Skip C++ benchmarks")
     run_parser.add_argument("--no-gpu", action="store_true", help="Skip GPU benchmarks")
     run_parser.add_argument("--no-cutlass", action="store_true", help="Skip Tensor Core benchmarks")
@@ -52,6 +56,19 @@ Examples:
             sizes = config.MEDIUM_SIZES
         elif args.large:
             sizes = config.ALL_SIZES
+        
+        # Override CPU threads if specified
+        if args.threads:
+            import config as cfg
+            cfg.DEFAULT_CPU_THREADS = args.threads
+            cfg.CPU_THREADS_CONFIG = args.threads
+            print(f"Using {args.threads} CPU threads (override)")
+        
+        # Override size limits if --force specified
+        if args.force:
+            import config as cfg
+            cfg.FORCE_LARGE_SIZES = True
+            print(f"Force running all sizes (WARNING: may hang!)")
         
         test_all(
             sizes=sizes,
