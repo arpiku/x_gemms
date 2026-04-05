@@ -2,6 +2,8 @@
 
 A comprehensive benchmarking framework for General Matrix Multiplication (GEMM) operations across multiple hardware platforms, data types, and algorithmic implementations.
 
+The goal is to study mat mul algorithms, understand bottlenecks, and develop understanding arounding how to optimize things better!
+
 ## Features
 
 - **Multi-Platform**: CPU (Python, C++) and GPU (CUDA) implementations
