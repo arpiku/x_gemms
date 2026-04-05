@@ -5,6 +5,7 @@
 #include <cstring>
 #include <cstdlib>
 #include <algorithm>
+#include "common.h"
 
 constexpr size_t STRASSEN_THRESHOLD_BLOCKED = 64;
 constexpr size_t BLOCK_SIZE = 64;
@@ -28,20 +29,6 @@ void gemm_blocked_base(const T* A, const T* B, T* C, size_t N, size_t block_size
                 }
             }
         }
-    }
-}
-
-template <typename T>
-void add_matrix(const T* A, const T* B, T* C, size_t N) {
-    for (size_t i = 0; i < N * N; ++i) {
-        C[i] = A[i] + B[i];
-    }
-}
-
-template <typename T>
-void sub_matrix(const T* A, const T* B, T* C, size_t N) {
-    for (size_t i = 0; i < N * N; ++i) {
-        C[i] = A[i] - B[i];
     }
 }
 
@@ -94,28 +81,28 @@ void strassen_blocked_impl(const T* A, const T* B, T* C, size_t N, size_t thresh
     T* M6 = (T*)malloc(sub_size * sizeof(T));
     T* M7 = (T*)malloc(sub_size * sizeof(T));
     
-    add_matrix(A11, A22, T1, mid);
-    add_matrix(B11, B22, T2, mid);
+    strassen_add_matrix(A11, A22, T1, mid);
+    strassen_add_matrix(B11, B22, T2, mid);
     strassen_blocked_impl(T1, T2, M1, mid, threshold, block_size);
     
-    add_matrix(A21, A22, T1, mid);
+    strassen_add_matrix(A21, A22, T1, mid);
     strassen_blocked_impl(T1, B11, M2, mid, threshold, block_size);
     
-    sub_matrix(B12, B22, T1, mid);
+    strassen_sub_matrix(B12, B22, T1, mid);
     strassen_blocked_impl(A11, T1, M3, mid, threshold, block_size);
     
-    sub_matrix(B21, B11, T1, mid);
+    strassen_sub_matrix(B21, B11, T1, mid);
     strassen_blocked_impl(A22, T1, M4, mid, threshold, block_size);
     
-    add_matrix(A11, A12, T1, mid);
+    strassen_add_matrix(A11, A12, T1, mid);
     strassen_blocked_impl(T1, B22, M5, mid, threshold, block_size);
     
-    sub_matrix(A21, A11, T1, mid);
-    add_matrix(B11, B12, T2, mid);
+    strassen_sub_matrix(A21, A11, T1, mid);
+    strassen_add_matrix(B11, B12, T2, mid);
     strassen_blocked_impl(T1, T2, M6, mid, threshold, block_size);
     
-    sub_matrix(A12, A22, T1, mid);
-    add_matrix(B21, B22, T2, mid);
+    strassen_sub_matrix(A12, A22, T1, mid);
+    strassen_add_matrix(B21, B22, T2, mid);
     strassen_blocked_impl(T1, T2, M7, mid, threshold, block_size);
     
     T* C11 = (T*)malloc(sub_size * sizeof(T));
@@ -123,17 +110,17 @@ void strassen_blocked_impl(const T* A, const T* B, T* C, size_t N, size_t thresh
     T* C21 = (T*)malloc(sub_size * sizeof(T));
     T* C22 = (T*)malloc(sub_size * sizeof(T));
     
-    add_matrix(M1, M4, C11, mid);
-    sub_matrix(C11, M5, C11, mid);
-    add_matrix(C11, M7, C11, mid);
+    strassen_add_matrix(M1, M4, C11, mid);
+    strassen_sub_matrix(C11, M5, C11, mid);
+    strassen_add_matrix(C11, M7, C11, mid);
     
-    add_matrix(M3, M5, C12, mid);
+    strassen_add_matrix(M3, M5, C12, mid);
     
-    add_matrix(M2, M4, C21, mid);
+    strassen_add_matrix(M2, M4, C21, mid);
     
-    sub_matrix(M1, M2, C22, mid);
-    add_matrix(C22, M3, C22, mid);
-    add_matrix(C22, M6, C22, mid);
+    strassen_sub_matrix(M1, M2, C22, mid);
+    strassen_add_matrix(C22, M3, C22, mid);
+    strassen_add_matrix(C22, M6, C22, mid);
     
     for (size_t i = 0; i < mid; ++i) {
         for (size_t j = 0; j < mid; ++j) {
