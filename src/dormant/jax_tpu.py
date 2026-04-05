@@ -71,7 +71,7 @@ def benchmark_jax_tpu(size: int, dtype: str = "fp32", warmup: int = 3, iteration
         "size": size,
         "dtype": dtype,
         "time_ms": time_ms,
-        "gfops": gflops,
+        "gflops": gflops,
         "bandwidth_gbs": 3 * size * size * 4 / time_ms / 1e6,
     }
 

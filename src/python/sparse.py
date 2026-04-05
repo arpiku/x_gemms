@@ -146,7 +146,7 @@ def benchmark_sparse_dense_cpu(
         "dtype": dtype,
         "sparsity": sparsity,
         "time_ms": time_ms,
-        "gfops": gflops,
+        "gflops": gflops,
         "bandwidth_gbs": bandwidth,
     }
 
@@ -228,7 +228,7 @@ def benchmark_sparse_gpu(
         "dtype": dtype,
         "sparsity": sparsity,
         "time_ms": time_ms,
-        "gfops": gflops,
+        "gflops": gflops,
         "bandwidth_gbs": bandwidth,
     }
 

@@ -45,7 +45,7 @@ __global__ void strassen_combine_submatrix_kernel(const float* src, float* dst, 
     int row = blockIdx.y * blockDim.y + threadIdx.y;
     int col = blockIdx.x * blockDim.x + threadIdx.x;
     
-    if (row < dst_N && col < dst_N) {
+    if (row < src_N && col < src_N) {
         dst[(row + row_offset) * dst_N + (col + col_offset)] = src[row * src_N + col];
     }
 }

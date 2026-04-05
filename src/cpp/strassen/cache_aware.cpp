@@ -42,9 +42,8 @@ public:
         return ptr;
     }
     
-    void reset() {
-        offset = 0;
-    }
+    size_t get_offset() const { return offset; }
+    void set_offset(size_t new_offset) { offset = new_offset; }
 };
 
 template <typename T>
@@ -86,8 +85,6 @@ void strassen_cache_aware_impl(const T* A, const T* B, T* C, size_t N,
     size_t mid = N / 2;
     size_t sub_size = mid * mid;
     
-    size_t saved_offset = pool.allocate(0) - pool.allocate(0);
-    
     T* A11 = pool.allocate(sub_size);
     T* A12 = pool.allocate(sub_size);
     T* A21 = pool.allocate(sub_size);
@@ -127,29 +124,38 @@ void strassen_cache_aware_impl(const T* A, const T* B, T* C, size_t N,
     T* C21 = pool.allocate(sub_size);
     T* C22 = pool.allocate(sub_size);
     
+    size_t saved_offset = pool.get_offset();
+    
     strassen_add_matrix(A11, A22, T1, mid);
     strassen_add_matrix(B11, B22, T2, mid);
     strassen_cache_aware_impl(T1, T2, M1, mid, threshold, block_size, pool);
+    pool.set_offset(saved_offset);
     
     strassen_add_matrix(A21, A22, T1, mid);
     strassen_cache_aware_impl(T1, B11, M2, mid, threshold, block_size, pool);
+    pool.set_offset(saved_offset);
     
     strassen_sub_matrix(B12, B22, T1, mid);
     strassen_cache_aware_impl(A11, T1, M3, mid, threshold, block_size, pool);
+    pool.set_offset(saved_offset);
     
     strassen_sub_matrix(B21, B11, T1, mid);
     strassen_cache_aware_impl(A22, T1, M4, mid, threshold, block_size, pool);
+    pool.set_offset(saved_offset);
     
     strassen_add_matrix(A11, A12, T1, mid);
     strassen_cache_aware_impl(T1, B22, M5, mid, threshold, block_size, pool);
+    pool.set_offset(saved_offset);
     
     strassen_sub_matrix(A21, A11, T1, mid);
     strassen_add_matrix(B11, B12, T2, mid);
     strassen_cache_aware_impl(T1, T2, M6, mid, threshold, block_size, pool);
+    pool.set_offset(saved_offset);
     
     strassen_sub_matrix(A12, A22, T1, mid);
     strassen_add_matrix(B21, B22, T2, mid);
     strassen_cache_aware_impl(T1, T2, M7, mid, threshold, block_size, pool);
+    pool.set_offset(saved_offset);
     
     strassen_add_matrix(M1, M4, C11, mid);
     strassen_sub_matrix(C11, M5, C11, mid);

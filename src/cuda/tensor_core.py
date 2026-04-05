@@ -112,7 +112,7 @@ def benchmark_tensor_core(
         "size": size,
         "dtype": dtype,
         "time_ms": time_ms,
-        "gfops": gflops,
+        "gflops": gflops,
         "bandwidth_gbs": bandwidth,
     }
 
@@ -179,7 +179,7 @@ def benchmark_tensor_core_int8(
         "size": size,
         "dtype": "int8",
         "time_ms": time_ms,
-        "gfops": gflops,
+        "gflops": gflops,
         "bandwidth_gbs": bandwidth,
     }
 

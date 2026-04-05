@@ -301,7 +301,7 @@ int main(int argc, char* argv[]) {
         std::cerr << "INFO: No sizes provided, using default MEDIUM_SIZES (64,128,256,512,1024,2048)" << std::endl;
     }
     
-    std::cout << "algorithm,size,time_ms,gfops,bandwidth_gbs" << std::endl;
+    std::cout << "algorithm,size,time_ms,gflops,bandwidth_gbs" << std::endl;
 
     // OPTIMIZATION: Generate matrices once for MAX size, use subsets for smaller sizes
     // This reduces initialization time significantly (~6x for medium tests)

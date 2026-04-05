@@ -41,7 +41,7 @@ def benchmark_numpy(size: int, dtype: str = "fp32", warmup: int = 3, iterations:
         "size": size,
         "dtype": dtype,
         "time_ms": time_ms,
-        "gfops": gflops,
+        "gflops": gflops,
         "bandwidth_gbs": bandwidth,
     }
 

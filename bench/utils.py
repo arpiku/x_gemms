@@ -69,6 +69,6 @@ def format_result(result: dict) -> str:
         f"{result['module']}.{result['algorithm']} "
         f"[N={result['size']}, {result['dtype']}] "
         f"{result['time_ms']:.2f}ms, "
-        f"{result['gfops']:.2f} GFLOPS, "
+        f"{result['gflops']:.2f} GFLOPS, "
         f"{result['bandwidth_gbs']:.2f} GB/s"
     )

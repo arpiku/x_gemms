@@ -16,9 +16,12 @@ Examples:
   python -m bench run --quick              Run quick benchmarks (sizes 64-1024)
   python -m bench run --medium             Run medium benchmarks (up to N=2048)
   python -m bench run --large              Run full benchmarks (up to N=20000)
+  python -m bench run --quick --save       Run and save with timestamp
+  python -m bench run --medium --save --tag baseline  Save with tag
   python -m bench run --quick --threads 4  Run with 4 CPU threads
   python -m bench run --medium --force     Force run all sizes (may hang!)
-  python -m bench plot                     Generate plots from results
+  python -m bench analyze                  Launch interactive Jupyter notebook
+  python -m bench analyze results/*.csv    Analyze specific CSV files
   python -m bench                          Show this help
         """
     )
@@ -32,6 +35,8 @@ Examples:
     run_parser.add_argument("--large", action="store_true", help="Full benchmarks (up to N=20000)")
     run_parser.add_argument("--threads", type=int, default=None, help="Number of CPU threads for C++ benchmarks")
     run_parser.add_argument("--force", action="store_true", help="Force run all sizes (dangerous - may hang!)")
+    run_parser.add_argument("--save", action="store_true", help="Save results with timestamp")
+    run_parser.add_argument("--tag", type=str, default=None, help="Optional tag for filename (e.g., 'baseline')")
     run_parser.add_argument("--no-cpp", action="store_true", help="Skip C++ benchmarks")
     run_parser.add_argument("--no-gpu", action="store_true", help="Skip GPU benchmarks")
     run_parser.add_argument("--no-cutlass", action="store_true", help="Skip Tensor Core benchmarks")
@@ -40,14 +45,14 @@ Examples:
     run_parser.add_argument("--no-winograd", action="store_true", help="Skip Winograd benchmarks")
     run_parser.add_argument("--sparse-backend", choices=["cpu", "gpu"], default="gpu", help="Sparse backend")
     
-    # plot subcommand
-    plot_parser = subparsers.add_parser("plot", help="Generate plots from results")
-    plot_parser.add_argument("--csv", default="benchmarks.csv", help="CSV file to plot")
+    # analyze subcommand
+    analyze_parser = subparsers.add_parser("analyze", help="Launch interactive analysis notebook")
+    analyze_parser.add_argument("files", nargs="*", help="CSV files to analyze (default: load latest)")
+    analyze_parser.add_argument("--no-browser", action="store_true", help="Don't auto-open browser")
     
     args = parser.parse_args()
     
     if args.command == "run":
-        # Import test_all for running benchmarks
         from tests.test_all import test_all
         import config
         
@@ -59,14 +64,12 @@ Examples:
         elif args.large:
             sizes = config.ALL_SIZES
         
-        # Override CPU threads if specified
         if args.threads:
             import config as cfg
             cfg.DEFAULT_CPU_THREADS = args.threads
             cfg.CPU_THREADS_CONFIG = args.threads
             print(f"Using {args.threads} CPU threads (override)")
         
-        # Override size limits if --force specified
         if args.force:
             import config as cfg
             cfg.FORCE_LARGE_SIZES = True
@@ -80,12 +83,25 @@ Examples:
             run_sparse=not args.no_sparse,
             run_strassen=not args.no_strassen,
             run_winograd=not args.no_winograd,
-            sparse_backend=args.sparse_backend
+            sparse_backend=args.sparse_backend,
+            save_results_flag=args.save,
+            tag=args.tag
         )
         
-    elif args.command == "plot":
-        from bench.plotter import generate_all_plots
-        generate_all_plots(args.csv)
+    elif args.command == "analyze":
+        from bench.analyzer import launch_notebook, BenchmarkAnalyzer, RESULTS_DIR
+        
+        if args.files:
+            csv_files = [str(f) for f in args.files]
+        else:
+            csv_files = None
+        
+        print("Launching interactive analysis notebook...")
+        print(f"Results directory: {RESULTS_DIR}")
+        if csv_files:
+            print(f"Loading files: {csv_files}")
+        
+        launch_notebook(csv_files)
         
     else:
         parser.print_help()

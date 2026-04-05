@@ -131,7 +131,7 @@ int main(int argc, char* argv[]) {
         fprintf(stderr, "INFO: No sizes provided, using default MEDIUM_SIZES (64,128,256,512,1024,2048)\n");
     }
     
-    printf("algorithm,size,time_ms,gfops,bandwidth_gbs\n");
+    printf("algorithm,size,time_ms,gflops,bandwidth_gbs\n");
 
     // OPTIMIZATION: Generate matrices once for MAX size, use subsets for smaller sizes
     int max_size = sizes[0];

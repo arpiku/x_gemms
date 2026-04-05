@@ -15,7 +15,7 @@ def test_tpu():
         if is_tensor_core_available():
             results = run_tensor_core_benchmarks(sizes=[256, 512])
             for r in results:
-                print(f"  {r['algorithm']} [N={r['size']}] {r['gfops']:.2f} GFLOPS")
+                print(f"  {r['algorithm']} [N={r['size']}] {r['gflops']:.2f} GFLOPS")
         else:
             print("  No Tensor Core available - skipping")
     except ImportError as e:

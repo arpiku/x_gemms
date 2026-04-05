@@ -173,7 +173,7 @@ def benchmark_strassen_naive(size: int, dtype: str = "fp32", warmup: int = 3, it
         "size": size,
         "dtype": dtype,
         "time_ms": time_ms,
-        "gfops": gflops,
+        "gflops": gflops,
         "bandwidth_gbs": bandwidth,
     }
 
@@ -215,7 +215,7 @@ def benchmark_strassen_numpy(size: int, dtype: str = "fp32", warmup: int = 3, it
         "size": size,
         "dtype": dtype,
         "time_ms": time_ms,
-        "gfops": gflops,
+        "gflops": gflops,
         "bandwidth_gbs": bandwidth,
     }
 
@@ -279,4 +279,4 @@ if __name__ == "__main__":
     print("\nRunning small benchmark...")
     results = run_strassen_benchmarks(sizes=[64, 128, 256])
     for r in results:
-        print(f"  {r['algorithm']} N={r['size']}: {r['gfops']:.2f} GFLOPS")
+        print(f"  {r['algorithm']} N={r['size']}: {r['gflops']:.2f} GFLOPS")

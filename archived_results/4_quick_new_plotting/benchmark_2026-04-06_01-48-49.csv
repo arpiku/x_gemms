@@ -1,0 +1,58 @@
+# x_gemms benchmark results
+# timestamp: 2026-04-06T01:48:49.792137
+# hostname: Azimuth
+# cuda: 13.1
+# gpu: NVIDIA GeForce RTX 5070
+module,algorithm,size,dtype,time_ms,gflops,bandwidth_gbs,sparsity
+python,numba,64,fp32,0.07387100004052627,,0.6653761282916812,
+python,numba,128,fp32,0.7065679997140251,,0.2782577191148973,
+python,numba,256,fp32,7.828484499896149,,0.10045775782150845,
+python,numba,512,fp32,80.90014650042576,,0.03888408286112862,
+python,strassen_naive,64,fp32,26.80273300029512,,0.0018338428398125967,
+python,strassen_naive,128,fp32,184.66289099978894,,0.0010646860283381175,
+python,strassen_numpy,64,fp32,0.004777500180352945,,10.288225671269117,
+python,strassen_numpy,128,fp32,0.06015050030327984,,3.268601242029561,
+python,strassen_numpy,256,fp32,0.5126900000504975,,1.533932785742925,
+python,strassen_numpy,512,fp32,3.941964500427275,,0.798010230599243,
+python,winograd_numpy,64,fp32,0.0044660000639851205,,11.005821606760229,
+python,winograd_numpy,128,fp32,0.059897500250372104,,3.2824074323331818,
+python,winograd_numpy,256,fp32,0.5175735004741,,1.5194595536278892,
+python,winograd_numpy,512,fp32,4.0038259994616965,,0.7856804967106299,
+cuda_naive,cuda_naive,64,fp32,0.06,,0.87,
+cublas,cublas,64,fp32,0.21,,0.23,
+strassen_cublas,strassen_cublas,64,fp32,0.21,,0.24,
+strassen_custom,strassen_custom,64,fp32,0.06,,0.88,
+winograd_cublas,winograd_cublas,64,fp32,0.21,,0.24,
+winograd_custom,winograd_custom,64,fp32,0.06,,0.87,
+cuda_naive,cuda_naive,128,fp32,0.08,,2.61,
+cublas,cublas,128,fp32,0.22,,0.91,
+strassen_cublas,strassen_cublas,128,fp32,0.35,,0.56,
+strassen_custom,strassen_custom,128,fp32,0.18,,1.08,
+winograd_cublas,winograd_cublas,128,fp32,0.34,,0.57,
+winograd_custom,winograd_custom,128,fp32,0.19,,1.01,
+cuda_naive,cuda_naive,256,fp32,0.13,,6.23,
+cublas,cublas,256,fp32,0.25,,3.12,
+strassen_cublas,strassen_cublas,256,fp32,1.32,,0.59,
+strassen_custom,strassen_custom,256,fp32,1.06,,0.74,
+winograd_cublas,winograd_cublas,256,fp32,1.32,,0.6,
+winograd_custom,winograd_custom,256,fp32,1.06,,0.74,
+cuda_naive,cuda_naive,512,fp32,0.4,,7.79,
+cublas,cublas,512,fp32,0.45,,6.99,
+strassen_cublas,strassen_cublas,512,fp32,9.86,,0.32,
+strassen_custom,strassen_custom,512,fp32,7.09,,0.44,
+winograd_cublas,winograd_cublas,512,fp32,9.86,,0.32,
+winograd_custom,winograd_custom,512,fp32,7.03,,0.45,
+tensor_core,tensor_core,64,fp16,0.010439499874337343,,2.3541357628073136,
+tensor_core,tensor_core,64,bf16,0.009370000043418258,,2.622838835231687,
+tensor_core,tensor_core,128,fp16,0.009523999779048609,,10.321713805186585,
+tensor_core,tensor_core,128,bf16,0.009744000180944568,,10.088669763393884,
+tensor_core,tensor_core,256,fp16,0.011163000181113603,,35.2249389608783,
+tensor_core,tensor_core,256,bf16,0.01083349980035564,,36.29630380268171,
+tensor_core,tensor_core,512,fp16,0.015313999938371126,,102.70758824146226,
+tensor_core,tensor_core,512,bf16,0.015367000742116943,,102.35334964806697,
+sparse_gpu,dense,1024,fp32,0.1145055002780282,,146.5188655502454,0.9
+sparse_gpu,csr,1024,fp32,0.13994450000609504,,92.91070674041285,0.9
+sparse_gpu,dense,2048,fp32,0.7199304995992861,,93.21575351697538,0.9
+sparse_gpu,csr,2048,fp32,1.0561574995335832,,49.24395236786957,0.9
+sparse_gpu,dense,4096,fp32,6.210830500549491,,43.22054127483445,0.9
+sparse_gpu,csr,4096,fp32,8.520075999967958,,24.41732660609863,0.9

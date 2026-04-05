@@ -1,12 +1,11 @@
 """Main test orchestrator - runs all modules with varying sizes/types."""
 
 import sys
-import csv
 import argparse
 import time
 import subprocess
 from pathlib import Path
-from concurrent.futures import TimeoutError as FuturesTimeoutError
+from typing import Optional, List
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
@@ -18,7 +17,6 @@ from src.python.winograd import run_winograd_benchmarks
 from src.cuda.tensor_core import run_tensor_core_benchmarks, is_tensor_core_available
 from src.python.sparse import run_sparse_benchmarks
 
-# Timeout for each benchmark in seconds
 BENCHMARK_TIMEOUT = getattr(config, 'BENCHMARK_TIMEOUT_SECONDS', 120)
 
 
@@ -32,16 +30,15 @@ def parse_csv_results(csv_output: str) -> list[dict]:
     for line in lines[1:]:
         values = line.split(',')
         if len(values) >= 5:
-            result = {
+            results.append({
                 "module": values[0].split('.')[0] if '.' in values[0] else values[0],
                 "algorithm": values[0].split('.')[-1] if '.' in values[0] else values[0],
                 "size": int(values[1]),
                 "dtype": "fp32",
                 "time_ms": float(values[2]),
-                "gfops": float(values[3]),
+                "gflops": float(values[3]),
                 "bandwidth_gbs": float(values[4]),
-            }
-            results.append(result)
+            })
     return results
 
 
@@ -50,7 +47,6 @@ def get_backend_label(algorithm: str, module: str = "") -> str:
     alg_lower = algorithm.lower()
     mod_lower = module.lower()
     
-    # New naming: (Device)-(Implementation)-(Library)-(Language)
     if 'tensor_core' in alg_lower:
         if 'fp16' in alg_lower:
             return "GPU-TensorCore-PyTorch-fp16-Python"
@@ -165,7 +161,6 @@ def test_reference(sizes=None, dtypes=None):
     if dtypes is None:
         dtypes = ["fp32"]
     
-    # Filter sizes based on algorithm type
     filtered_sizes = []
     for size in sizes:
         skip, reason = should_skip_size("numba", size)
@@ -183,14 +178,13 @@ def test_reference(sizes=None, dtypes=None):
             label = "CPU-Naive-Numba-Python"
             print(f"  [N={size}, dtype={dtype}] {label}", end=" ", flush=True)
             try:
-                # Try Numba first, fall back to NumPy
                 r = run_numba_benchmarks([size], [dtype])
                 if not r:
                     r = run_numpy_benchmarks([size], [dtype])
                     label = "CPU-Naive-NumPy-Python"
                 if r:
                     result = r[0]
-                    print(f"-> {result['gfops']:.2f} GFLOPS")
+                    print(f"-> {result['gflops']:.2f} GFLOPS")
                     results.append(result)
                 else:
                     print("-> FAILED")
@@ -203,21 +197,18 @@ def test_reference(sizes=None, dtypes=None):
 def test_cpp(sizes=None):
     """Test C++ implementations via subprocess."""
     print("\n[Module: C++ CPU]")
-    import subprocess
     
     cpp_binary = Path(__file__).parent.parent / "src" / "cpp" / "gemm_bench"
     if not cpp_binary.exists():
         print(f"  C++ binary not found: {cpp_binary}")
         return []
     
-    # Use provided sizes or default to MEDIUM_SIZES
     if sizes is None:
         sizes = config.get_default_sizes()
     
-    # Filter sizes based on parallel vs single-thread limits
     filtered_sizes = []
     for size in sizes:
-        skip, reason = should_skip_size("openmp", size)  # Check with parallel algo
+        skip, reason = should_skip_size("openmp", size)
         if skip:
             print(f"  [N={size}] Skipping for single-thread ({reason})")
         else:
@@ -227,7 +218,6 @@ def test_cpp(sizes=None):
         print("  No sizes to run after filtering")
         return []
     
-    # Build command: gemm_bench <threads> <sizes...>
     cmd = [str(cpp_binary), str(config.DEFAULT_CPU_THREADS)] + [str(s) for s in filtered_sizes]
     print(f"  Running with {config.DEFAULT_CPU_THREADS} threads, sizes: {filtered_sizes}")
     
@@ -236,18 +226,17 @@ def test_cpp(sizes=None):
             cmd,
             capture_output=True,
             text=True,
-            timeout=600,  # 10 min timeout for C++ tests
+            timeout=600,
             cwd=Path(__file__).parent.parent
         )
         if result.returncode == 0:
-            # Check for INFO message about default sizes
             if "INFO: No sizes provided" in result.stderr:
                 print(f"  Note: C++ defaulted to MEDIUM_SIZES (no sizes passed)")
             
             cpp_results = parse_csv_results(result.stdout)
             for r in cpp_results:
                 backend = get_backend_label(r['algorithm'], r['module'])
-                print(f"  [N={r['size']}] {backend} -> {r['gfops']:.2f} GFLOPS")
+                print(f"  [N={r['size']}] {backend} -> {r['gflops']:.2f} GFLOPS")
             return cpp_results
         else:
             print(f"  C++ benchmark failed: {result.stderr[:100]}")
@@ -269,11 +258,9 @@ def test_gpu(sizes=None):
         print(f"  GPU binary not found: {gpu_binary}")
         return []
     
-    # Use provided sizes or default to MEDIUM_SIZES
     if sizes is None:
         sizes = config.get_default_sizes()
     
-    # Build command: gpu_bench <sizes...>
     cmd = [str(gpu_binary)] + [str(s) for s in sizes]
     print(f"  Running with sizes: {sizes}")
     
@@ -286,14 +273,13 @@ def test_gpu(sizes=None):
             cwd=Path(__file__).parent.parent
         )
         if result.returncode == 0:
-            # Check for INFO message about default sizes
             if "INFO: No sizes provided" in result.stderr:
                 print(f"  Note: CUDA defaulted to MEDIUM_SIZES (no sizes passed)")
             
             results = parse_csv_results(result.stdout)
             for r in results:
                 backend = get_backend_label(r['algorithm'], r['module'])
-                print(f"  [N={r['size']}] {backend} -> {r['gfops']:.2f} GFLOPS")
+                print(f"  [N={r['size']}] {backend} -> {r['gflops']:.2f} GFLOPS")
             return results
         else:
             print(f"  GPU benchmark failed: {result.stderr[:100]}")
@@ -319,7 +305,6 @@ def test_cutlass(sizes=None, dtypes=None):
     if dtypes is None:
         dtypes = ["fp16", "bf16"]
     
-    # Skip very large for TensorCore (optional, can enable)
     sizes = [s for s in sizes if s <= 4096]
     
     results = []
@@ -330,7 +315,7 @@ def test_cutlass(sizes=None, dtypes=None):
                 r = run_tensor_core_benchmarks([size], [dtype])
                 if r:
                     result = r[0]
-                    print(f"-> {result['gfops']:.2f} GFLOPS")
+                    print(f"-> {result['gflops']:.2f} GFLOPS")
                     results.append(result)
                 else:
                     print("-> FAILED")
@@ -359,7 +344,7 @@ def test_sparse(sizes=None, backend="gpu"):
             )
             if r:
                 for res in r:
-                    print(f"{res['algorithm']}->{res['gfops']:.2f} ", end="")
+                    print(f"{res['algorithm']}->{res['gflops']:.2f} ", end="")
                     results.append(res)
                 print()
             else:
@@ -395,7 +380,7 @@ def test_strassen_python(sizes=None, dtypes=None):
             if r:
                 for res in r:
                     label = get_backend_label(res['algorithm'], res['module'])
-                    print(f"  [N={res['size']}] {label} -> {res['gfops']:.2f} GFLOPS")
+                    print(f"  [N={res['size']}] {label} -> {res['gflops']:.2f} GFLOPS")
                     results.append(res)
         except Exception as e:
             print(f"  Strassen naive error: {str(e)[:50]}")
@@ -414,7 +399,7 @@ def test_strassen_python(sizes=None, dtypes=None):
             if r:
                 for res in r:
                     label = get_backend_label(res['algorithm'], res['module'])
-                    print(f"  [N={res['size']}] {label} -> {res['gfops']:.2f} GFLOPS")
+                    print(f"  [N={res['size']}] {label} -> {res['gflops']:.2f} GFLOPS")
                     results.append(res)
         except Exception as e:
             print(f"  Strassen numpy error: {str(e)[:50]}")
@@ -447,7 +432,7 @@ def test_winograd_python(sizes=None, dtypes=None):
             if r:
                 for res in r:
                     label = get_backend_label(res['algorithm'], res['module'])
-                    print(f"  [N={res['size']}] {label} -> {res['gfops']:.2f} GFLOPS")
+                    print(f"  [N={res['size']}] {label} -> {res['gflops']:.2f} GFLOPS")
                     results.append(res)
         except Exception as e:
             print(f"  Winograd numpy error: {str(e)[:50]}")
@@ -460,21 +445,16 @@ def test_tpu():
     return test_cutlass()
 
 
-def generate_plots():
-    """Generate benchmark plots."""
-    from bench.plotter import generate_all_plots
-    generate_all_plots()
-
-
 def save_results(results: list[dict], output_file: str = "benchmarks.csv"):
-    """Save all results to CSV."""
+    """Save all results to CSV (legacy format, no timestamp)."""
     if not results:
         return
     
+    import csv
     output_path = Path(__file__).parent.parent / "results" / output_file
     output_path.parent.mkdir(parents=True, exist_ok=True)
     
-    fieldnames = ["module", "algorithm", "size", "dtype", "time_ms", "gfops", "bandwidth_gbs", "sparsity"]
+    fieldnames = ["module", "algorithm", "size", "dtype", "time_ms", "gflops", "bandwidth_gbs", "sparsity"]
     
     with open(output_path, "w", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames, extrasaction='ignore')
@@ -494,7 +474,9 @@ def test_all(
     run_strassen=True,
     run_winograd=True,
     sparse_backend="gpu",
-    large_sizes=False
+    large_sizes=False,
+    save_results_flag: bool = False,
+    tag: Optional[str] = None
 ):
     """Run all benchmark tests."""
     start_time = time.perf_counter()
@@ -513,6 +495,10 @@ def test_all(
     print(f"Matrix sizes (C++/GPU): {cpp_sizes}")
     print(f"Matrix sizes (Python): {python_sizes}")
     print(f"Timeout per test: {BENCHMARK_TIMEOUT}s")
+    if save_results_flag:
+        print(f"Saving results with timestamp: enabled")
+        if tag:
+            print(f"Tag: {tag}")
     print()
     
     all_results = []
@@ -546,8 +532,12 @@ def test_all(
     print("=" * 60)
     
     if all_results:
-        save_results(all_results)
-        generate_plots()
+        if save_results_flag:
+            from bench.analyzer import save_results_with_timestamp
+            output_path = save_results_with_timestamp(all_results, tag=tag)
+            print(f"Timestamped results saved to: {output_path}")
+        else:
+            save_results(all_results)
     
     return all_results
 
@@ -569,6 +559,8 @@ if __name__ == "__main__":
     parser.add_argument("--large", action="store_true", help="Use large matrix sizes (up to 20000)")
     parser.add_argument("--quick", action="store_true", help="Use quick test sizes only")
     parser.add_argument("--medium", action="store_true", help="Use medium test sizes (up to 8192)")
+    parser.add_argument("--save", action="store_true", help="Save results with timestamp")
+    parser.add_argument("--tag", type=str, default=None, help="Optional tag for filename")
     
     args = parser.parse_args()
     
@@ -591,5 +583,7 @@ if __name__ == "__main__":
         run_strassen=not args.no_strassen,
         run_winograd=not args.no_winograd,
         sparse_backend=args.sparse_backend,
-        large_sizes=args.large
+        large_sizes=args.large,
+        save_results_flag=args.save,
+        tag=args.tag
     )

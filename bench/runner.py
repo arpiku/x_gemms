@@ -70,7 +70,7 @@ class BenchmarkRunner:
             "size": size,
             "dtype": dtype,
             "time_ms": time_ms,
-            "gfops": gflops,
+            "gflops": gflops,
             "bandwidth_gbs": bandwidth,
         }
         self.results.append(result)
@@ -82,7 +82,7 @@ class BenchmarkRunner:
             return
         with open(self.output_file, "w", newline="") as f:
             writer = csv.DictWriter(
-                f, fieldnames=["module", "algorithm", "size", "dtype", "time_ms", "gfops", "bandwidth_gbs"]
+                f, fieldnames=["module", "algorithm", "size", "dtype", "time_ms", "gflops", "bandwidth_gbs"]
             )
             writer.writeheader()
             writer.writerows(self.results)
