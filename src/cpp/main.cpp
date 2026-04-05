@@ -18,6 +18,8 @@
 #include "strassen/naive.cpp"
 #include "strassen/blocked.cpp"
 #include "strassen/cache_aware.cpp"
+#include "strassen/winograd_blocked.cpp"
+#include "strassen/winograd_cache_aware.cpp"
 
 template <typename T>
 void initialize_matrix(T* A, size_t N) {
@@ -215,6 +217,38 @@ double benchmark_strassen_cache_aware(T* A, T* B, T* C, size_t N, size_t thresho
     for (int i = 0; i < iterations; ++i) {
         std::memset(C, 0, N * N * sizeof(T));
         gemm_strassen_cache_aware(A, B, C, N, threshold, block_size);
+    }
+    auto end = std::chrono::high_resolution_clock::now();
+    return std::chrono::duration<double, std::milli>(end - start).count() / iterations;
+}
+
+template <typename T>
+double benchmark_winograd_blocked(T* A, T* B, T* C, size_t N, size_t threshold = 64, size_t block_size = 64, int iterations = 10) {
+    for (int w = 0; w < 3; ++w) {
+        std::memset(C, 0, N * N * sizeof(T));
+        gemm_winograd_blocked(A, B, C, N, threshold, block_size);
+    }
+
+    auto start = std::chrono::high_resolution_clock::now();
+    for (int i = 0; i < iterations; ++i) {
+        std::memset(C, 0, N * N * sizeof(T));
+        gemm_winograd_blocked(A, B, C, N, threshold, block_size);
+    }
+    auto end = std::chrono::high_resolution_clock::now();
+    return std::chrono::duration<double, std::milli>(end - start).count() / iterations;
+}
+
+template <typename T>
+double benchmark_winograd_cache_aware(T* A, T* B, T* C, size_t N, size_t threshold = 64, size_t block_size = 32, int iterations = 10) {
+    for (int w = 0; w < 3; ++w) {
+        std::memset(C, 0, N * N * sizeof(T));
+        gemm_winograd_cache_aware(A, B, C, N, threshold, block_size);
+    }
+
+    auto start = std::chrono::high_resolution_clock::now();
+    for (int i = 0; i < iterations; ++i) {
+        std::memset(C, 0, N * N * sizeof(T));
+        gemm_winograd_cache_aware(A, B, C, N, threshold, block_size);
     }
     auto end = std::chrono::high_resolution_clock::now();
     return std::chrono::duration<double, std::milli>(end - start).count() / iterations;

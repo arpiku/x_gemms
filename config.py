@@ -44,6 +44,8 @@ ALL_SIZES: List[int] = [
 # Size Limits (to prevent hanging on slow algorithms)
 # =============================================================================
 
+VERY_SLOW_MAX_SIZE: int = 128     # For Python naive implementations (strassen_naive, etc.)
+SLOW_MAX_SIZE: int = 512          # For Python NumPy/BLAS implementations
 SINGLE_THREAD_MAX_SIZE: int = 2048  # Max size for naive/Numba/single-thread algos
 PARALLEL_MAX_SIZE: int = 8192       # Max size for parallel algorithms (openmp, etc.)
 FORCE_LARGE_SIZES: bool = False     # Override to allow all sizes (dangerous!)

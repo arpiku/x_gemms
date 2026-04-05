@@ -181,18 +181,6 @@ def plot_bandwidth_by_size(
     output_path = RESULTS_DIR / output_file
     plt.savefig(output_path, dpi=300, bbox_inches='tight')
     plt.close()
-
-    ax.set_xlabel("Matrix Size (N)", fontsize=12)
-    ax.set_ylabel("Bandwidth (GB/s)", fontsize=12)
-    ax.set_title(title, fontsize=14, fontweight='bold')
-    ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left', fontsize=8)
-    ax.set_xscale("log")
-    ax.grid(True, alpha=0.3, which="both")
-
-    plt.tight_layout()
-    output_path = RESULTS_DIR / output_file
-    plt.savefig(output_path, dpi=150, bbox_inches='tight')
-    plt.close()
     return str(output_path)
 
 

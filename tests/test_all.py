@@ -113,27 +113,33 @@ def should_skip_size(algorithm: str, size: int) -> tuple[bool, str]:
     
     alg_lower = algorithm.lower()
     
-    # Single-thread algorithms: limit to SINGLE_THREAD_MAX_SIZE
-    single_thread_algos = ['naive', 'sse', 'avx2', 'avx512', 'blocked', 'cache_aware', 
-                           'numpy', 'numba', 'reference']
+    very_slow_algos = ['strassen_naive', 'winograd_naive']
+    slow_algos = ['numba', 'strassen_numpy', 'winograd_numpy']
     is_parallel = any(x in alg_lower for x in ['openmp', 'std_thread', 'thread'])
-    is_gpu = any(x in alg_lower for x in ['cuda', 'tensor_core', 'cublas', 'cutlass', 'sparse_gpu'])
-    is_tensor_core = 'tensor_core' in alg_lower
+    is_gpu = any(x in alg_lower for x in ['cuda', 'tensor_core', 'cublas', 'cutlass', 'sparse_gpu', 'strassen_cublas', 'strassen_custom', 'winograd_cublas', 'winograd_custom'])
     
-    if is_gpu or is_tensor_core:
-        # GPU/TensorCore: up to PARALLEL_MAX_SIZE
+    is_very_slow = any(x in alg_lower for x in very_slow_algos)
+    is_slow = any(x in alg_lower for x in slow_algos)
+    
+    if is_very_slow:
+        if size > config.VERY_SLOW_MAX_SIZE:
+            return True, f"size > {config.VERY_SLOW_MAX_SIZE} for very slow Python naive algo"
+        return False, ""
+    elif is_gpu:
         if size > config.PARALLEL_MAX_SIZE:
             return True, f"size > {config.PARALLEL_MAX_SIZE} for GPU"
         return False, ""
     elif is_parallel:
-        # Parallel CPU: up to PARALLEL_MAX_SIZE
         if size > config.PARALLEL_MAX_SIZE:
             return True, f"size > {config.PARALLEL_MAX_SIZE} for parallel CPU"
         return False, ""
+    elif is_slow:
+        if size > config.SLOW_MAX_SIZE:
+            return True, f"size > {config.SLOW_MAX_SIZE} for slow Python BLAS algo"
+        return False, ""
     else:
-        # Single-thread: up to SINGLE_THREAD_MAX_SIZE
         if size > config.SINGLE_THREAD_MAX_SIZE:
-            return True, f"size > {config.SINGLE_THREAD_MAX_SIZE} for single-thread"
+            return True, f"size > {config.SINGLE_THREAD_MAX_SIZE} for single-thread CPU"
         return False, ""
 
 
@@ -360,27 +366,47 @@ def test_strassen_python(sizes=None, dtypes=None):
     if dtypes is None:
         dtypes = ["fp32"]
     
-    filtered_sizes = []
-    for size in sizes:
-        skip, reason = should_skip_size("strassen", size)
-        if skip:
-            print(f"  [N={size}] CPU-Strassen-Python -> Skipping ({reason})")
-        else:
-            filtered_sizes.append(size)
-    
-    if not filtered_sizes:
-        return []
-    
     results = []
-    try:
-        r = run_strassen_benchmarks(sizes=filtered_sizes, dtypes=dtypes)
-        if r:
-            for res in r:
-                label = get_backend_label(res['algorithm'], res['module'])
-                print(f"  [N={res['size']}] {label} -> {res['gfops']:.2f} GFLOPS")
-                results.append(res)
-    except Exception as e:
-        print(f"  Strassen error: {str(e)[:50]}")
+    
+    naive_sizes = []
+    for size in sizes:
+        skip, reason = should_skip_size("strassen_naive", size)
+        if skip:
+            print(f"  [N={size}] CPU-Strassen-Naive-Python -> Skipping ({reason})")
+        else:
+            naive_sizes.append(size)
+    
+    if naive_sizes:
+        try:
+            r = run_strassen_benchmarks(sizes=naive_sizes, dtypes=dtypes, variants=["naive"])
+            if r:
+                for res in r:
+                    label = get_backend_label(res['algorithm'], res['module'])
+                    print(f"  [N={res['size']}] {label} -> {res['gfops']:.2f} GFLOPS")
+                    results.append(res)
+        except Exception as e:
+            print(f"  Strassen naive error: {str(e)[:50]}")
+    
+    numpy_sizes = []
+    for size in sizes:
+        skip, reason = should_skip_size("strassen_numpy", size)
+        if skip:
+            print(f"  [N={size}] CPU-Strassen-NumPy-Python -> Skipping ({reason})")
+        else:
+            numpy_sizes.append(size)
+    
+    if numpy_sizes:
+        try:
+            r = run_strassen_benchmarks(sizes=numpy_sizes, dtypes=dtypes, variants=["numpy"])
+            if r:
+                for res in r:
+                    label = get_backend_label(res['algorithm'], res['module'])
+                    print(f"  [N={res['size']}] {label} -> {res['gfops']:.2f} GFLOPS")
+                    results.append(res)
+        except Exception as e:
+            print(f"  Strassen numpy error: {str(e)[:50]}")
+    
+    return results
     
     return results
 

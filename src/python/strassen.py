@@ -220,23 +220,35 @@ def benchmark_strassen_numpy(size: int, dtype: str = "fp32", warmup: int = 3, it
     }
 
 
-def run_strassen_benchmarks(sizes: list[int] = None, dtypes: list[str] = None, threshold: int = None) -> list[dict]:
-    """Run Strassen benchmarks for both naive and NumPy implementations."""
+def run_strassen_benchmarks(sizes: list[int] = None, dtypes: list[str] = None, threshold: int = None, variants: list[str] = None) -> list[dict]:
+    """Run Strassen benchmarks for specified variants.
+    
+    Args:
+        sizes: List of matrix sizes to benchmark
+        dtypes: List of data types
+        threshold: Crossover threshold for Strassen
+        variants: List of variants to run - ["naive"], ["numpy"], or ["naive", "numpy"]
+                  If None, runs both variants
+    """
     if sizes is None:
         sizes = config.QUICK_SIZES
     if dtypes is None:
         dtypes = ["fp32"]
     if threshold is None:
         threshold = config.STRASSEN_CROSSOVER_THRESHOLD
+    if variants is None:
+        variants = ["naive", "numpy"]
     
     results = []
     for size in sizes:
         for dtype in dtypes:
-            result = benchmark_strassen_naive(size, dtype, threshold=threshold)
-            results.append(result)
+            if "naive" in variants:
+                result = benchmark_strassen_naive(size, dtype, threshold=threshold)
+                results.append(result)
             
-            result = benchmark_strassen_numpy(size, dtype, threshold=threshold)
-            results.append(result)
+            if "numpy" in variants:
+                result = benchmark_strassen_numpy(size, dtype, threshold=threshold)
+                results.append(result)
     
     return results
 
