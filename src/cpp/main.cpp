@@ -15,6 +15,9 @@
 #endif
 #include "parallel/openmp.cpp"
 #include "parallel/std_thread.cpp"
+#include "strassen/naive.cpp"
+#include "strassen/blocked.cpp"
+#include "strassen/cache_aware.cpp"
 
 template <typename T>
 void initialize_matrix(T* A, size_t N) {
@@ -169,6 +172,54 @@ double benchmark_std_thread(T* A, T* B, T* C, size_t N, int num_threads = 0, int
     return std::chrono::duration<double, std::milli>(end - start).count() / iterations;
 }
 
+template <typename T>
+double benchmark_strassen_naive(T* A, T* B, T* C, size_t N, size_t threshold = 64, int iterations = 10) {
+    for (int w = 0; w < 3; ++w) {
+        std::memset(C, 0, N * N * sizeof(T));
+        gemm_strassen_naive(A, B, C, N, threshold);
+    }
+
+    auto start = std::chrono::high_resolution_clock::now();
+    for (int i = 0; i < iterations; ++i) {
+        std::memset(C, 0, N * N * sizeof(T));
+        gemm_strassen_naive(A, B, C, N, threshold);
+    }
+    auto end = std::chrono::high_resolution_clock::now();
+    return std::chrono::duration<double, std::milli>(end - start).count() / iterations;
+}
+
+template <typename T>
+double benchmark_strassen_blocked(T* A, T* B, T* C, size_t N, size_t threshold = 64, size_t block_size = 64, int iterations = 10) {
+    for (int w = 0; w < 3; ++w) {
+        std::memset(C, 0, N * N * sizeof(T));
+        gemm_strassen_blocked(A, B, C, N, threshold, block_size);
+    }
+
+    auto start = std::chrono::high_resolution_clock::now();
+    for (int i = 0; i < iterations; ++i) {
+        std::memset(C, 0, N * N * sizeof(T));
+        gemm_strassen_blocked(A, B, C, N, threshold, block_size);
+    }
+    auto end = std::chrono::high_resolution_clock::now();
+    return std::chrono::duration<double, std::milli>(end - start).count() / iterations;
+}
+
+template <typename T>
+double benchmark_strassen_cache_aware(T* A, T* B, T* C, size_t N, size_t threshold = 64, size_t block_size = 32, int iterations = 10) {
+    for (int w = 0; w < 3; ++w) {
+        std::memset(C, 0, N * N * sizeof(T));
+        gemm_strassen_cache_aware(A, B, C, N, threshold, block_size);
+    }
+
+    auto start = std::chrono::high_resolution_clock::now();
+    for (int i = 0; i < iterations; ++i) {
+        std::memset(C, 0, N * N * sizeof(T));
+        gemm_strassen_cache_aware(A, B, C, N, threshold, block_size);
+    }
+    auto end = std::chrono::high_resolution_clock::now();
+    return std::chrono::duration<double, std::milli>(end - start).count() / iterations;
+}
+
 void print_results(const char* name, size_t N, double time_ms) {
     double gflops = (2.0 * N * N * N) / (time_ms * 1e6);
     double bytes = 3.0 * N * N * 4.0;
@@ -264,6 +315,15 @@ int main(int argc, char* argv[]) {
 
         time = benchmark_std_thread(A, B, C, N, num_threads);
         print_results("std_thread", N, time);
+
+        time = benchmark_strassen_naive(A, B, C, N, 64);
+        print_results("strassen_naive", N, time);
+
+        time = benchmark_strassen_blocked(A, B, C, N, 64, 64);
+        print_results("strassen_blocked", N, time);
+
+        time = benchmark_strassen_cache_aware(A, B, C, N, 64, 32);
+        print_results("strassen_cache_aware", N, time);
     }
 
     // Free matrices after all sizes are processed
