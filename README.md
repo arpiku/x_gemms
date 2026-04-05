@@ -5,9 +5,8 @@ A comprehensive benchmarking framework for General Matrix Multiplication (GEMM) 
 ## Overview
 
 This project benchmarks various GEMM implementations ranging from naive algorithms to research-level optimizations across:
-- **CPU**: C++ implementations with SIMD (SSE, AVX2, AVX512) and parallelization (OpenMP, threads)
-- **GPU**: CUDA with cuBLAS and CUTLASS
-- **TPU**: JAX/PyTorch XLA backends
+- **CPU**: Python (NumPy, Numba) and C++ with SIMD (SSE, AVX2, AVX512) and parallelization (OpenMP, threads)
+- **GPU**: CUDA with cuBLAS and Tensor Cores
 
 ## Quick Start
 
@@ -15,16 +14,87 @@ This project benchmarks various GEMM implementations ranging from naive algorith
 # Install Python dependencies
 pip install -r requirements.txt
 
-# Build C++ modules
+# Build all (C++ and CUDA)
 make
 
-# Run all benchmarks
-python tests/test_all.py
+# Run benchmarks using CLI
+py_env/bin/python -m bench run --quick
+py_env/bin/python -m bench run --medium
+py_env/bin/python -m bench run --large
 
-# Run specific module benchmarks
-python tests/test_basic.py
-python tests/test_gpu.py
-python tests/test_tpu.py
+# Or run directly via test script
+py_env/bin/python tests/test_all.py --quick
+```
+
+## CLI Usage
+
+```bash
+# Run benchmarks
+py_env/bin/python -m bench run --quick       # Sizes 64-1024
+py_env/bin/python -m bench run --medium      # Sizes up to 8192
+py_env/bin/python -m bench run --large       # Sizes up to 20000
+
+# Run without certain modules
+py_env/bin/python -m bench run --quick --no-cpp
+py_env/bin/python -m bench run --quick --no-gpu
+py_env/bin/python -m bench run --quick --no-cutlass
+py_env/bin/python -m bench run --quick --no-sparse
+
+# Generate plots from results
+py_env/bin/python -m bench plot
+
+# Using Makefile
+make test          # Build and run quick benchmarks
+make test-medium   # Build and run medium benchmarks
+make test-large    # Build and run large benchmarks
+```
+
+## Project Structure
+
+```
+x_gemms/
+├── config.py              # Central configuration
+├── requirements.txt       # Python dependencies
+├── Makefile              # Top-level build (calls src/cpp and src/cuda)
+├── README.md / CONTEXT.md
+│
+├── src/                  # Algorithm implementations
+│   ├── python/           # Python implementations
+│   │   ├── numpy.py     # NumPy baseline
+│   │   ├── numba.py     # Numba JIT
+│   │   └── sparse.py    # Sparse matrix (CPU/GPU)
+│   ├── cpp/             # C++ CPU implementations
+│   │   ├── Makefile
+│   │   ├── main.cpp
+│   │   ├── basic/       # naive, blocked, cache_aware
+│   │   ├── simd/        # sse, avx2, avx512
+│   │   └── parallel/    # openmp, std_thread
+│   ├── cuda/            # CUDA GPU implementations
+│   │   ├── Makefile
+│   │   ├── main.cu
+│   │   ├── basic/       # naive kernel
+│   │   ├── cublas/      # cuBLAS reference
+│   │   └── cutlass/     # CUTLASS reference
+│   └── dormant/         # Dormant implementations (Google TPU)
+│
+├── bench/                # Benchmarking utilities
+│   ├── runner.py        # Main orchestrator
+│   ├── plotter.py       # Visualization
+│   ├── utils.py        # Matrix generation, timing
+│   ├── profiler.py     # GPU profiling (NSight)
+│   ├── memory_tracker.py
+│   └── __main__.py     # CLI entry point
+│
+├── tests/               # Test scripts
+│   ├── test_all.py     # Main orchestrator
+│   ├── test_basic.py   # C++ tests
+│   ├── test_gpu.py     # GPU tests
+│   └── test_tpu.py     # Tensor Core tests
+│
+└── results/             # Output directory
+    ├── benchmarks.csv
+    ├── memory_tracking.csv
+    └── *.png           # Generated plots
 ```
 
 ## Benchmark Test Matrix
@@ -35,8 +105,20 @@ python tests/test_tpu.py
 
 ## Output
 
-Results are saved to `pybench/results/` as CSV files. Use `pybench/plotter.py` to generate performance graphs.
+Results are saved to `results/` as CSV files. Use `bench/plotter.py` or `python -m bench plot` to generate performance graphs.
 
-## Project Structure
+## Sparse Matrix Behavior (TODO: Study)
 
-See [CONTEXT.md](CONTEXT.md) for detailed module documentation.
+**Observations from GPU sparse benchmarks:**
+- At 90% sparsity (10% non-zero), GPU sparse CSR format is ~12x slower than dense
+- This is because the overhead of sparse tensor format conversion exceeds the benefit
+- Dense operations on GPU can leverage massive parallelism more efficiently
+
+**Technical Notes:**
+- PyTorch sparse CSR tensor support is in "beta state"
+- `torch.sparse.check_sparse_tensor_invariants.enable()` enables runtime checks at slight performance cost
+
+**When to study:**
+- Determine the crossover point where sparse becomes faster than dense
+- Investigate higher sparsity levels (95%, 99%)
+- Compare CPU vs GPU sparse performance

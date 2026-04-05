@@ -11,7 +11,7 @@ import numpy as np
 BENCHMARK_SIZES = [64, 128, 256, 512, 1024, 2048, 4096, 8192]
 SPARSE_SIZES = [1024, 2048]
 DATA_TYPES = ["fp32", "fp16", "bf16", "int8"]
-RESULTS_DIR = Path(__file__).parent / "results"
+RESULTS_DIR = Path(__file__).parent.parent / "results"
 
 
 def compute_gflops(size: int, time_ms: float, dtype: str) -> float:

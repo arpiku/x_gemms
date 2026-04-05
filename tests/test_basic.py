@@ -6,7 +6,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from pybench.runner import BenchmarkRunner, BENCHMARK_SIZES
+from bench.runner import BenchmarkRunner, BENCHMARK_SIZES
 
 
 def test_basic():
@@ -15,7 +15,7 @@ def test_basic():
     
     for size in BENCHMARK_SIZES[:4]:
         result = subprocess.run(
-            ["./cpp/gemm_bench", str(size)],
+            ["./src/cpp/gemm_bench", str(size)],
             capture_output=True,
             text=True,
             cwd=Path(__file__).parent.parent

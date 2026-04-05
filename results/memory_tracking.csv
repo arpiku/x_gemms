@@ -1,0 +1,7 @@
+algorithm,size,dtype,peak_gpu_memory_mb,host_memory_mb,temp_memory_mb,effective_bandwidth_gbs,time_ms
+tensor_core_fp32,256,fp32,8.88,157.20,0.07,6.98,0.11
+tensor_core_fp16,256,fp16,8.50,231.32,0.04,3.63,0.11
+tensor_core_fp32,512,fp32,11.12,0.00,0.30,25.58,0.12
+tensor_core_fp16,512,fp16,9.62,1.00,0.15,16.92,0.09
+tensor_core_fp32,1024,fp32,20.12,0.00,1.20,35.86,0.35
+tensor_core_fp16,1024,fp16,14.12,0.00,0.60,52.96,0.12

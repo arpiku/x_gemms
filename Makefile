@@ -1,16 +1,38 @@
-CXX = g++
-CXXFLAGS = -O3 -march=native -std=c++17 -fopenmp -mavx2 -Wno-psabi
-LDFLAGS = -fopenmp
+# Top-level Makefile for x_gemms
 
-TARGET = gemm_bench
-SRC = cpp/main.cpp
+.PHONY: all cpp cuda clean test help
 
-all: $(TARGET)
+all: cpp cuda
 
-$(TARGET): $(SRC)
-	$(CXX) $(CXXFLAGS) -o $(TARGET) $(SRC) $(LDFLAGS)
+cpp:
+	@echo "Building C++ benchmarks..."
+	$(MAKE) -C src/cpp
+
+cuda:
+	@echo "Building CUDA benchmarks..."
+	$(MAKE) -C src/cuda
 
 clean:
-	rm -f $(TARGET)
+	@echo "Cleaning builds..."
+	$(MAKE) -C src/cpp clean
+	$(MAKE) -C src/cuda clean
 
-.PHONY: all clean
+test: all
+	@echo "Running quick benchmarks..."
+	py_env/bin/python -m bench run --quick
+
+test-medium: all
+	py_env/bin/python -m bench run --medium
+
+test-large: all
+	py_env/bin/python -m bench run --large
+
+help:
+	@echo "x_gemms build targets:"
+	@echo "  make          - Build all (cpp + cuda)"
+	@echo "  make cpp      - Build C++ benchmarks only"
+	@echo "  make cuda     - Build CUDA benchmarks only"
+	@echo "  make clean    - Clean all builds"
+	@echo "  make test     - Build and run quick benchmarks"
+	@echo "  make test-medium - Build and run medium benchmarks"
+	@echo "  make test-large - Build and run large benchmarks"

@@ -13,151 +13,118 @@ A comprehensive benchmarking framework for General Matrix Multiplication (GEMM) 
 
 ```
 x_gemms/
-├── README.md                    # Project overview
-├── CONTEXT.md                   # This file
-├── config.py                    # Central configuration
-├── requirements.txt             # Python dependencies
-├── Makefile                     # C++ build system
-├── CMakeLists.txt               # CMake configuration
-├── .gitignore                   # Git ignore rules
+├── config.py              # Central configuration
+├── requirements.txt       # Python dependencies
+├── Makefile              # Top-level build (calls src/cpp and src/cuda)
+├── CMakeLists.txt        # CMake configuration
+├── .gitignore           # Git ignore rules
+├── README.md            # Project overview
+├── CONTEXT.md           # This file
 │
-├── pybench/                     # Python benchmark orchestration
-│   ├── runner.py               # Main benchmark runner
-│   ├── plotter.py              # Visualization (plots)
-│   ├── utils.py                # Matrix generation, timing helpers
-│   └── results/                # Output directory (CSV + PNG)
+├── src/                  # Algorithm implementations
+│   ├── python/           # Python implementations (CPU)
+│   │   ├── __init__.py
+│   │   ├── numpy.py     # NumPy baseline
+│   │   ├── numba.py     # Numba JIT
+│   │   └── sparse.py    # Sparse matrix (CSR/COO)
+│   ├── cpp/              # C++ CPU implementations
+│   │   ├── Makefile
+│   │   ├── main.cpp
+│   │   ├── basic/        # naive, blocked, cache_aware
+│   │   ├── simd/         # sse, avx2, avx512
+│   │   └── parallel/    # openmp, std_thread
+│   ├── cuda/             # CUDA GPU implementations
+│   │   ├── Makefile
+│   │   ├── main.cu
+│   │   ├── basic/        # naive kernel
+│   │   ├── cublas/       # cuBLAS reference
+│   │   └── cutlass/      # CUTLASS reference
+│   └── dormant/           # Dormant implementations
+│       ├── __init__.py
+│       ├── jax_tpu.py   # [TODO] Google TPU (requires cloud)
+│       └── pytorch_tpu.py # [TODO] PyTorch XLA TPU (requires cloud)
 │
-├── cpp/                         # C++ CPU benchmarks
-│   ├── main.cpp                # Entry point
-│   ├── Makefile                # Build configuration
-│   ├── basic/                  # Basic algorithms
-│   │   ├── naive.cpp           # Triple-loop O(n³)
-│   │   ├── blocked.cpp         # Blocked matrix multiplication
-│   │   └── cache_aware.cpp     # Cache-aware tiling
-│   ├── simd/                    # SIMD optimized
-│   │   ├── sse.cpp             # SSE 128-bit
-│   │   ├── avx2.cpp            # AVX2 256-bit
-│   │   └── avx512.cpp          # AVX512 512-bit
-│   └── parallel/                # Threading
-│       ├── openmp.cpp          # OpenMP parallelization
-│       └── std_thread.cpp      # std::thread parallelization
-│
-├── gpu/                         # CUDA GPU benchmarks
-│   ├── main.cu                 # CUDA entry point
-│   ├── Makefile               # GPU build configuration
-│   ├── basic/                 # Naive CUDA kernel
-│   ├── cublas/                # cuBLAS reference
-│   ├── cutlass/               # CUTLASS implementations
-│   └── custom/                 # Research algorithms (placeholder)
-│
-├── tpu/                         # Tensor Core / Accelerators
+├── bench/                 # Benchmarking utilities
 │   ├── __init__.py
-│   ├── reference.py            # NumPy/Numba baseline
-│   ├── jax_tpu.py              # [TODO] JAX Google TPU (requires cloud)
-│   ├── pytorch_tpu.py          # [TODO] PyTorch Google TPU (requires cloud)
-│   ├── cutlass_bench.py        # CUTLASS-backed Tensor Core benchmarks
-│   ├── sparse.py              # Sparse matrix benchmarks (CSR/COO)
-│   ├── memory_tracker.py       # CPU + GPU memory tracking
-│   └── gpu_profiler.py         # NSight Compute integration
+│   ├── __main__.py       # CLI entry point
+│   ├── runner.py         # Main benchmark orchestrator
+│   ├── plotter.py        # Visualization (plots)
+│   ├── utils.py          # Matrix generation, timing helpers
+│   ├── profiler.py       # GPU profiling (NSight)
+│   └── memory_tracker.py # CPU + GPU memory tracking
 │
-└── tests/
-    ├── test_all.py             # Main orchestrator
-    ├── test_basic.py
-    ├── test_gpu.py
-    └── test_tpu.py
+├── tests/                # Test scripts
+│   ├── test_all.py      # Main orchestrator
+│   ├── test_basic.py    # C++ tests
+│   ├── test_gpu.py      # GPU tests
+│   └── test_tpu.py      # Tensor Core tests
+│
+└── results/             # Output directory
+    ├── benchmarks.csv
+    ├── memory_tracking.csv
+    └── *.png            # Generated plots
 ```
 
 ---
 
 ## 3. Module Documentation
 
-### 3.1 pybench/ - Benchmark Orchestration
+### 3.1 src/python/ - Python Implementations
+
+| File | Description | Algorithm |
+|------|-------------|-----------|
+| `numpy.py` | NumPy baseline | `A @ B` |
+| `numba.py` | Numba JIT-accelerated | Triple-loop |
+| `sparse.py` | Sparse matrix (CSR/COO) | scipy.sparse + PyTorch |
+
+### 3.2 src/cpp/ - C++ CPU Implementations
+
+#### basic/
+| File | Algorithm | Complexity |
+|------|-----------|------------|
+| `naive.cpp` | Triple-loop | O(n³) |
+| `blocked.cpp` | Blocked | O(n³) |
+| `cache_aware.cpp` | Cache-aware | O(n³) |
+
+#### simd/
+| File | Vector Width |
+|------|--------------|
+| `sse.cpp` | 128-bit (4x fp32) |
+| `avx2.cpp` | 256-bit (8x fp32) |
+| `avx512.cpp` | 512-bit (16x fp32) |
+
+#### parallel/
+| File | Parallelization |
+|------|-----------------|
+| `openmp.cpp` | OpenMP pragmas |
+| `std_thread.cpp` | std::thread |
+
+### 3.3 src/cuda/ - CUDA GPU Implementations
 
 | File | Description |
 |------|-------------|
-| `runner.py` | Main benchmark runner - executes all modules, collects timing, computes GFLOPS |
-| `plotter.py` | Generates performance comparison graphs (5+ plot types) |
-| `utils.py` | Matrix generation, timing helpers, result formatting |
+| `main.cu` | CUDA entry point |
+| `basic/naive.cu` | Naive CUDA kernel |
+| `cublas/cublas_bench.cpp` | cuBLAS reference |
+| `cutlass/cutlass_bench.cpp` | CUTLASS reference |
 
-**Study Notes**: This module orchestrates all benchmarks and provides visualization for performance analysis. Key plots include GFLOPS comparison, timing graphs (linear scale), bandwidth analysis, and category comparisons.
+### 3.4 src/cuda/tensor_core.py - Tensor Core
 
----
+| Function | Description |
+|----------|-------------|
+| `benchmark_tensor_core()` | fp16/bf16 Tensor Core via PyTorch |
+| `run_tensor_core_benchmarks()` | Run multiple sizes/types |
 
-### 3.2 cpp/ - CPU Implementations
-
-#### 3.2.1 basic/ - Basic Algorithms
-
-| Module | Algorithm | Complexity | Benefits | Study Notes |
-|--------|-----------|------------|----------|-------------|
-| `naive.cpp` | Triple-loop | O(n³) | Simple, correct baseline | Good for understanding basic multiplication; shows exponential time growth |
-| `blocked.cpp` | Blocked | O(n³) | Cache-efficient | Reduces cache misses by processing blocks; ~20-30x faster than naive at N=1024 |
-| `cache_aware.cpp` | Cache-aware | O(n³) | Multi-level tiling | Optimized for L1/L2/L3 cache hierarchy; best CPU performance |
-
-#### 3.2.2 simd/ - SIMD Optimized
-
-| Module | Vector Width | Benefits | Study Notes |
-|--------|--------------|----------|--------------|
-| `sse.cpp` | 128-bit (4x fp32) | 4x parallelism | Limited to small matrices; demonstrates SIMD basics |
-| `avx2.cpp` | 256-bit (8x fp32) | 8x parallelism | Good balance of performance and compatibility |
-| `avx512.cpp` | 512-bit (16x fp32) | 16x parallelism | Requires AVX512 support; fastest CPU but limited hardware |
-
-#### 3.2.3 parallel/ - Multi-threaded
-
-| Module | Parallelization | Benefits | Study Notes |
-|--------|-----------------|----------|--------------|
-| `openmp.cpp` | OpenMP pragmas | Easy to implement, portable | Uses all available cores; ~50-150x speedup |
-| `std_thread.cpp` | std::thread | Manual control | Similar performance to OpenMP; more code complexity |
-
-**Supported data types**: FP32 (full), FP16 (partial), INT8 (template-based)
-**Build**: Compiled to `gemm_bench` executable
-
----
-
-### 3.3 gpu/ - CUDA GPU Implementations
-
-| Module | Description | Benefits | Study Notes |
-|--------|-------------|----------|--------------|
-| `basic/naive.cu` | Naive CUDA kernel | Simple baseline | Shows GPU vs CPU speedup; ~1000x faster than CPU naive |
-| `cublas/cublas_bench.cpp` | cuBLAS reference | Optimized library | Near-peak performance; comparison benchmark |
-| `cutlass/` | CUTLASS kernels | Research-level | [See Section 5 for TODO] |
-| `custom/` | Custom algorithms | Placeholder | [See Section 5 for TODO] |
-
-**Supported data types**: FP32, FP16, BF16, INT8, TF32
-**Build**: Compiled to `gpu_bench` executable
-
----
-
-### 3.4 tpu/ - Tensor Core / Accelerators
-
-#### Active Modules (Working on RTX 5070)
-
-| Module | Description | Benefits | Study Notes |
-|--------|-------------|----------|--------------|
-| `cutlass_bench.py` | Tensor Core via PyTorch | CUTLASS-backed performance | 40,000-50,000 GFLOPS at N=1024; uses fp16/bf16 |
-| `sparse.py` | Sparse matrix (CSR/COO) | Memory-efficient | 90% sparsity testing; compares formats |
-| `memory_tracker.py` | Memory footprint | Full memory analysis | Tracks GPU + CPU memory; outputs to memory_tracking.csv |
-| `gpu_profiler.py` | NSight integration | Detailed profiling | DRAM bandwidth, L2 cache (when NSight available) |
-| `reference.py` | NumPy/Numba baseline | CPU reference | 1-7 GFLOPS; slower than optimized |
-
-#### Dormant Modules (Require Google Cloud TPU)
-
-| Module | Status | Requirements |
-|--------|--------|---------------|
-| `jax_tpu.py` | TODO | Google Cloud TPU or TPU VM |
-| `pytorch_tpu.py` | TODO | Google Cloud TPU or TPU VM |
-
-**Note**: These modules require Google Cloud TPU hardware which is not available on the current system. They are kept as reference for future expansion.
-
----
-
-### 3.5 tests/ - Test Orchestration
+### 3.5 bench/ - Benchmarking Utilities
 
 | File | Description |
 |------|-------------|
-| `test_all.py` | Main orchestrator - runs ALL modules |
-| `test_basic.py` | Tests C++ implementations |
-| `test_gpu.py` | Tests GPU implementations |
-| `test_tpu.py` | Tests Tensor Core implementations |
+| `runner.py` | Main orchestrator, GFLOPS calculation |
+| `plotter.py` | Visualization (GFLOPS, timing, bandwidth plots) |
+| `utils.py` | Matrix generation, timing helpers |
+| `profiler.py` | NSight Compute integration |
+| `memory_tracker.py` | Memory footprint tracking |
+| `__main__.py` | CLI entry point |
 
 ---
 
@@ -167,69 +134,54 @@ x_gemms/
 
 | Category | Sizes |
 |----------|-------|
-| Small | 64, 128, 256 |
-| Medium | 512, 1024 |
-| Large | 2048, 4096, 8192 |
-| Very Large | 10000, 15000, 20000 |
-| Sparse | 1024, 2048, 4096 |
+| Quick | 64, 128, 256, 512, 1024 |
+| Medium | 64, 128, 256, 512, 1024, 2048, 4096, 8192 |
+| All | Up to 20000 |
 
 ### Data Types
 
-| Type | CPU (C++) | GPU (CUDA) | Tensor Core | Reference |
-|------|-----------|------------|-------------|-----------|
-| FP32 | ✓ | ✓ | N/A | ✓ |
-| FP16 | N/A | ✓ | ✓ | ✓ |
-| BF16 | N/A | ✓ | ✓ | ✓ (fallback to FP32) |
-| INT8 | ✓ | ✓ | ✓ | N/A |
+| Type | Python | C++ | CUDA |
+|------|--------|-----|------|
+| FP32 | ✓ | ✓ | ✓ |
+| FP16 | ✓ | - | ✓ |
+| BF16 | ✓ | - | ✓ |
+| INT8 | ✓ | ✓ | ✓ |
 
 ---
 
-## 5. Future Work: Strassen's Algorithm (TODO)
+## 5. Running Benchmarks
 
-### 5.1 Overview
+### CLI (Recommended)
 
-Strassen's Matrix Multiplication (1969) is a divide-and-conquer algorithm that reduces the number of multiplications from 8 to 7 for 2x2 matrix blocks, achieving O(n^2.807) complexity instead of O(n³).
+```bash
+# Build all
+make
 
-### 5.2 Implementation Requirements
+# Run benchmarks
+py_env/bin/python -m bench run --quick
+py_env/bin/python -m bench run --medium
+py_env/bin/python -m bench run --large
 
-- [ ] Recursive matrix splitting with base case threshold
-- [ ] 7 temporary matrix computation (Strassen step)
-- [ ] Addition/subtraction optimization
-- [ ] Memory footprint tracking (expect ~30% more memory)
+# Generate plots
+py_env/bin/python -m bench plot
 
-### 5.3 Benchmarking Requirements
+# Using Makefile
+make test          # Build and run quick
+make test-medium   # Build and run medium
+make test-large    # Build and run large
+```
 
-| Metric | Description | Current Support |
-|--------|-------------|-----------------|
-| GFLOPS | Compute performance | ✓ Full |
-| Timing | Execution time | ✓ Linear scale added |
-| Memory | GPU/CPU footprint | ✓ memory_tracker.py |
-| Bandwidth | Memory bandwidth | ✓ plotter.py + refs |
-| Accuracy | Relative error vs naive | [TODO] Need implementation |
-| Cache | L2 cache behavior | [TODO] Need NSight |
+### Direct test scripts
 
-### 5.4 Key Study Questions
-
-1. **Crossover point**: At what matrix size does Strassen become faster than naive/blocked?
-2. **Memory trade-off**: Is the speedup worth the 30% memory increase?
-3. **Accuracy**: How does numerical precision compare for fp16/bf16?
-4. **Cache behavior**: How does recursive splitting affect cache utilization?
-
-### 5.5 Implementation Location
-
-Create new module: `tpu/strassen.py`
-
-### 5.6 Related Reading
-
-- Strassen, V. (1969). "Gaussian Elimination is Not Optimal"
-- Higham, N. "Accuracy and Stability of Numerical Algorithms"
-- Various optimized Strassen implementations (Plasmen, KAP)
+```bash
+py_env/bin/python tests/test_all.py --quick
+py_env/bin/python tests/test_basic.py
+py_env/bin/python tests/test_tpu.py
+```
 
 ---
 
 ## 6. Hardware Configuration
-
-### Current System
 
 | Component | Specification |
 |-----------|---------------|
@@ -239,94 +191,36 @@ Create new module: `tpu/strassen.py`
 | **System RAM** | 64 GB DDR5 |
 | **CUDA Version** | 13.1 |
 
-### Memory Bandwidth Reference
-
-| Component | Theoretical Bandwidth |
-|-----------|----------------------|
-| RTX 5070 (GDDR7) | ~500 GB/s |
-| CPU DDR5 per channel | ~50 GB/s |
-| CPU L1 Cache | ~2 TB/s |
-| CPU L2 Cache | ~1 TB/s |
-| CPU L3 Cache | ~500 GB/s |
-
 ---
 
-## 7. Running Benchmarks
+## 7. Future Work: Strassen's Algorithm (TODO)
 
-### Quick Test (sizes 64-1024)
-```bash
-python tests/test_all.py --quick
-```
+### 7.1 Overview
 
-### Full Test with Large Sizes (up to 20000)
-```bash
-python tests/test_all.py --large
-```
+Strassen's Matrix Multiplication (1969) reduces multiplications from 8 to 7 for 2x2 blocks, achieving O(n^2.807) instead of O(n³).
 
-### Individual Tests
-```bash
-# C++ benchmarks
-./cpp/gemm_bench 8
+### 7.2 Implementation Location
 
-# GPU benchmarks  
-./gpu/gpu_bench
+Create: `src/python/strassen.py` or `src/cuda/strassen.cu`
 
-# Memory tracking
-python -c "from tpu.memory_tracker import run_memory_benchmarks; run_memory_benchmarks()"
+### 7.3 Key Study Questions
 
-# GPU Profiling
-python -c "from tpu.gpu_profiler import run_gpu_profiling; run_gpu_profiling()"
-```
+1. **Crossover point**: At what size does Strassen become faster?
+2. **Memory trade-off**: Is speedup worth 30% memory increase?
+3. **Accuracy**: Numerical precision for fp16/bf16?
+4. **Cache behavior**: How does recursive splitting affect cache?
 
-### Output Files (pybench/results/)
+### 7.4 Benchmarking Requirements
 
-| File | Description |
-|------|-------------|
-| `benchmarks.csv` | Main benchmark results |
-| `memory_tracking.csv` | Memory usage metrics |
-| `gpu_profiling.csv` | Detailed GPU profiling |
-| `gflops_by_size.png` | GFLOPS vs size (log) |
-| `timing_linear.png` | Execution time (linear) |
-| `bandwidth_by_size.png` | Bandwidth with reference lines |
-| `category_comparison.png` | Category comparison |
-| `sparse_comparison.png` | Sparse format comparison |
-| `tensor_core_comparison.png` | FP16 vs BF16 |
-
----
-
-## 8. Continuing This Project
-
-### Prerequisites
-```bash
-# Python environment
-source py_env/bin/activate
-
-# Dependencies (already installed)
-pip install -r requirements.txt
-
-# C++ build (if modified)
-cd cpp && make clean && make
-
-# GPU build (if modified)
-cd gpu && make clean && make
-```
-
-### Quick Status Check
-```bash
-# Run quick benchmarks
-python tests/test_all.py --quick
-
-# Check outputs
-ls pybench/results/
-```
-
-### Notes for Future Sessions
-- All modules are self-contained
-- Configuration centralized in `config.py`
-- CONTEXT.md contains complete context
-- Git repository tracks all changes
+| Metric | Current Support |
+|--------|-----------------|
+| GFLOPS | ✓ Full |
+| Timing | ✓ Linear scale |
+| Memory | ✓ memory_tracker.py |
+| Bandwidth | ✓ plotter.py |
+| Accuracy | [TODO] Need implementation |
+| Cache | [TODO] Need NSight |
 
 ---
 
 *Last Updated: April 2026*
-*Project: GEMM Benchmarking for Algorithm Study (Strassen focus)*

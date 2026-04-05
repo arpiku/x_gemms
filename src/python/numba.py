@@ -1,7 +1,4 @@
-"""Reference GEMM implementations for baseline comparison.
-
-Uses NumPy/Numba for CPU baseline when TPU/GPU not available.
-"""
+"""Numba-accelerated GEMM implementation."""
 
 import numpy as np
 from typing import Optional
@@ -33,15 +30,8 @@ else:
         return A @ B
 
 
-def gemm_numpy(A: np.ndarray, B: np.ndarray) -> np.ndarray:
-    """Standard NumPy GEMM."""
-    return A @ B
-
-
-def benchmark_reference(size: int, dtype: str = "fp32", use_numba: bool = True, 
-                        warmup: int = 3, iterations: int = 10) -> dict:
-    """Benchmark reference CPU implementation."""
-    # NumPy doesn't have bfloat16, handle it specially
+def benchmark_numba(size: int, dtype: str = "fp32", warmup: int = 3, iterations: int = 10) -> dict:
+    """Benchmark Numba implementation."""
     dtype_map = {"fp32": np.float32, "fp16": np.float16, "bf16": np.float32, "int8": np.int8}
     np_dtype = dtype_map.get(dtype, np.float32)
 
@@ -50,49 +40,48 @@ def benchmark_reference(size: int, dtype: str = "fp32", use_numba: bool = True,
     B = np.random.randn(size, size).astype(np_dtype)
     C = np.zeros((size, size), dtype=np_dtype)
 
-    if use_numba and NUMBA_AVAILABLE:
-        gemm_func = gemm_numba
-    else:
-        def wrapper(A, B, C):
-            C[:] = A @ B
-            return C
-        gemm_func = wrapper
+    import time
 
     for _ in range(warmup):
-        C = gemm_func(A, B, C)
+        C = gemm_numba(A, B, C)
 
-    import time
     times = []
     for _ in range(iterations):
         start = time.perf_counter()
-        C = gemm_func(A, B, C)
+        C = gemm_numba(A, B, C)
         end = time.perf_counter()
         times.append((end - start) * 1000)
 
     time_ms = np.median(times)
     gflops = 2 * size**3 / time_ms / 1e6
 
+    bytes_per_elem = {"fp32": 4, "fp16": 2, "bf16": 2, "int8": 1}.get(dtype, 4)
+    bandwidth = 3 * size * size * bytes_per_elem / time_ms / 1e6
+
     return {
-        "module": "reference",
-        "algorithm": "numba" if use_numba and NUMBA_AVAILABLE else "numpy",
+        "module": "python",
+        "algorithm": "numba",
         "size": size,
         "dtype": dtype,
         "time_ms": time_ms,
         "gfops": gflops,
-        "bandwidth_gbs": 3 * size * size * 4 / time_ms / 1e6,
+        "bandwidth_gbs": bandwidth,
     }
 
 
-def run_reference_benchmarks(sizes: list[int] = None, dtypes: list[str] = None) -> list[dict]:
-    """Run reference benchmarks."""
+def run_numba_benchmarks(sizes: list[int] = None, dtypes: list[str] = None) -> list[dict]:
+    """Run Numba benchmarks."""
     if sizes is None:
         sizes = [64, 128, 256, 512, 1024]
     if dtypes is None:
         dtypes = ["fp32"]
 
+    if not NUMBA_AVAILABLE:
+        return []
+
     results = []
     for size in sizes:
         for dtype in dtypes:
-            result = benchmark_reference(size, dtype)
+            result = benchmark_numba(size, dtype)
             results.append(result)
     return results

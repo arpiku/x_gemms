@@ -26,6 +26,12 @@ ALL_SIZES: List[int] = [
 # Sizes for quick tests (subset of ALL_SIZES)
 QUICK_SIZES: List[int] = [64, 128, 256, 512, 1024]
 
+# Sizes for medium tests (excludes very large, good for development)
+MEDIUM_SIZES: List[int] = [64, 128, 256, 512, 1024, 2048, 4096, 8192]
+
+# Timeout per benchmark in seconds (prevents hanging on large sizes)
+BENCHMARK_TIMEOUT_SECONDS: int = 120  # 2 minutes max per test
+
 # =============================================================================
 # Data Types
 # =============================================================================

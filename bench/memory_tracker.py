@@ -7,7 +7,7 @@ This module records memory footprint for each benchmark, enabling analysis of:
 - Intermediate buffer sizes
 - Memory bandwidth efficiency
 
-Outputs to: pybench/results/memory_tracking.csv
+Outputs to: results/memory_tracking.csv
 """
 
 import csv
@@ -27,7 +27,7 @@ except ImportError:
     TORCH_AVAILABLE = False
 
 
-RESULTS_DIR = Path(__file__).parent.parent / "pybench" / "results"
+RESULTS_DIR = Path(__file__).parent.parent / "results"
 MEMORY_CSV = RESULTS_DIR / "memory_tracking.csv"
 
 

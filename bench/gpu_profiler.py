@@ -30,7 +30,7 @@ except ImportError:
 NSIGHT_PATH = "/usr/local/NVIDIA-Nsight-Compute-2026.1"
 NSIGHT_CLI = os.path.join(NSIGHT_PATH, "ncu")  # Use ncu directly
 
-RESULTS_DIR = Path(__file__).parent.parent / "pybench" / "results"
+RESULTS_DIR = Path(__file__).parent.parent / "results"
 
 
 @dataclass

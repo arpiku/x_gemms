@@ -16,7 +16,7 @@ except ImportError:
     MATPLOTLIB_AVAILABLE = False
 
 
-RESULTS_DIR = Path(__file__).parent / "results"
+RESULTS_DIR = Path(__file__).parent.parent / "results"
 
 
 def load_results(csv_file: str = "benchmarks.csv") -> list[dict]:
