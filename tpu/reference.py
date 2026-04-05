@@ -41,7 +41,8 @@ def gemm_numpy(A: np.ndarray, B: np.ndarray) -> np.ndarray:
 def benchmark_reference(size: int, dtype: str = "fp32", use_numba: bool = True, 
                         warmup: int = 3, iterations: int = 10) -> dict:
     """Benchmark reference CPU implementation."""
-    dtype_map = {"fp32": np.float32, "fp16": np.float16, "bf16": np.bfloat16, "int8": np.int8}
+    # NumPy doesn't have bfloat16, handle it specially
+    dtype_map = {"fp32": np.float32, "fp16": np.float16, "bf16": np.float32, "int8": np.int8}
     np_dtype = dtype_map.get(dtype, np.float32)
 
     np.random.seed(42)

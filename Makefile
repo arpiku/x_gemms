@@ -1,5 +1,5 @@
 CXX = g++
-CXXFLAGS = -O3 -march=native -std=c++17 -fopenmp
+CXXFLAGS = -O3 -march=native -std=c++17 -fopenmp -mavx2 -Wno-psabi
 LDFLAGS = -fopenmp
 
 TARGET = gemm_bench

@@ -1,0 +1,58 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+*.egg
+.pytest_cache/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+venv/
+env/
+py_env/
+.venv/
+
+# C++ Build
+*.o
+*.so
+*.a
+*.dylib
+*.dll
+gemm_bench
+gpu_bench
+
+# CUDA
+*.cu.o
+*.cubin
+*.cux
+*.ptx
+*.fatbin
+
+# CMake
+build/
+CMakeFiles/
+cmake_install.cmake
+Makefile
+CMakeCache.txt
+*.cmake
+
+# Results (generated during benchmark runs)
+pybench/results/*.csv
+pybench/results/*.png
+pybench/results/*.pdf
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Logs
+*.log
+
+# Environment
+.env
+.env.local

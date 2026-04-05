@@ -8,7 +8,7 @@ import time
 DTYPE_MAP = {
     "fp32": np.float32,
     "fp16": np.float16,
-    "bf16": np.bfloat16,
+    "bf16": np.float32,  # NumPy doesn't have bfloat16, use float32
     "int8": np.int8,
 }
 

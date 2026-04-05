@@ -2,12 +2,15 @@
 #include <chrono>
 #include <cstring>
 #include <cmath>
+#include <algorithm>
 #include "basic/naive.cpp"
 #include "basic/blocked.cpp"
 #include "basic/cache_aware.cpp"
 #include "simd/sse.cpp"
 #include "simd/avx2.cpp"
+#ifdef __AVX512F__
 #include "simd/avx512.cpp"
+#endif
 #include "parallel/openmp.cpp"
 #include "parallel/std_thread.cpp"
 
@@ -19,32 +22,145 @@ void initialize_matrix(T* A, size_t N) {
 }
 
 template <typename T>
-double benchmark_function(void (*func)(const T*, const T*, T*, size_t), T* A, T* B, T* C, size_t N, int iterations = 10) {
+double benchmark_naive(T* A, T* B, T* C, size_t N, int iterations = 10) {
     for (int w = 0; w < 3; ++w) {
         std::memset(C, 0, N * N * sizeof(T));
-        func(A, B, C, N);
+        gemm_naive(A, B, C, N);
     }
 
     auto start = std::chrono::high_resolution_clock::now();
     for (int i = 0; i < iterations; ++i) {
         std::memset(C, 0, N * N * sizeof(T));
-        func(A, B, C, N);
+        gemm_naive(A, B, C, N);
     }
     auto end = std::chrono::high_resolution_clock::now();
     return std::chrono::duration<double, std::milli>(end - start).count() / iterations;
 }
 
 template <typename T>
-double benchmark_function_blocked(void (*func)(const T*, const T*, T*, size_t, size_t), T* A, T* B, T* C, size_t N, size_t block_size = 64, int iterations = 10) {
+double benchmark_blocked(T* A, T* B, T* C, size_t N, size_t block_size = 64, int iterations = 10) {
     for (int w = 0; w < 3; ++w) {
         std::memset(C, 0, N * N * sizeof(T));
-        func(A, B, C, N, block_size);
+        gemm_blocked(A, B, C, N, block_size);
     }
 
     auto start = std::chrono::high_resolution_clock::now();
     for (int i = 0; i < iterations; ++i) {
         std::memset(C, 0, N * N * sizeof(T));
-        func(A, B, C, N, block_size);
+        gemm_blocked(A, B, C, N, block_size);
+    }
+    auto end = std::chrono::high_resolution_clock::now();
+    return std::chrono::duration<double, std::milli>(end - start).count() / iterations;
+}
+
+template <typename T>
+double benchmark_cache_aware(T* A, T* B, T* C, size_t N, size_t block_size = 32, int iterations = 10) {
+    for (int w = 0; w < 3; ++w) {
+        std::memset(C, 0, N * N * sizeof(T));
+        gemm_cache_aware(A, B, C, N, block_size);
+    }
+
+    auto start = std::chrono::high_resolution_clock::now();
+    for (int i = 0; i < iterations; ++i) {
+        std::memset(C, 0, N * N * sizeof(T));
+        gemm_cache_aware(A, B, C, N, block_size);
+    }
+    auto end = std::chrono::high_resolution_clock::now();
+    return std::chrono::duration<double, std::milli>(end - start).count() / iterations;
+}
+
+double benchmark_sse(float* A, float* B, float* C, size_t N, int iterations = 10) {
+    for (int w = 0; w < 3; ++w) {
+        std::memset(C, 0, N * N * sizeof(float));
+        gemm_sse(A, B, C, N);
+    }
+
+    auto start = std::chrono::high_resolution_clock::now();
+    for (int i = 0; i < iterations; ++i) {
+        std::memset(C, 0, N * N * sizeof(float));
+        gemm_sse(A, B, C, N);
+    }
+    auto end = std::chrono::high_resolution_clock::now();
+    return std::chrono::duration<double, std::milli>(end - start).count() / iterations;
+}
+
+double benchmark_avx2(float* A, float* B, float* C, size_t N, size_t block_size = 64, int iterations = 10) {
+    for (int w = 0; w < 3; ++w) {
+        std::memset(C, 0, N * N * sizeof(float));
+        gemm_avx2_blocked(A, B, C, N, block_size);
+    }
+
+    auto start = std::chrono::high_resolution_clock::now();
+    for (int i = 0; i < iterations; ++i) {
+        std::memset(C, 0, N * N * sizeof(float));
+        gemm_avx2_blocked(A, B, C, N, block_size);
+    }
+    auto end = std::chrono::high_resolution_clock::now();
+    return std::chrono::duration<double, std::milli>(end - start).count() / iterations;
+}
+
+double benchmark_avx512(float* A, float* B, float* C, size_t N, size_t block_size = 64, int iterations = 10) {
+#ifdef __AVX512F__
+    for (int w = 0; w < 3; ++w) {
+        std::memset(C, 0, N * N * sizeof(float));
+        gemm_avx512_blocked(A, B, C, N, block_size);
+    }
+
+    auto start = std::chrono::high_resolution_clock::now();
+    for (int i = 0; i < iterations; ++i) {
+        std::memset(C, 0, N * N * sizeof(float));
+        gemm_avx512_blocked(A, B, C, N, block_size);
+    }
+    auto end = std::chrono::high_resolution_clock::now();
+    return std::chrono::duration<double, std::milli>(end - start).count() / iterations;
+#else
+    return benchmark_avx2(A, B, C, N, block_size, iterations);
+#endif
+}
+
+template <typename T>
+double benchmark_openmp(T* A, T* B, T* C, size_t N, int num_threads = 0, int iterations = 10) {
+    for (int w = 0; w < 3; ++w) {
+        std::memset(C, 0, N * N * sizeof(T));
+        gemm_openmp(A, B, C, N, num_threads);
+    }
+
+    auto start = std::chrono::high_resolution_clock::now();
+    for (int i = 0; i < iterations; ++i) {
+        std::memset(C, 0, N * N * sizeof(T));
+        gemm_openmp(A, B, C, N, num_threads);
+    }
+    auto end = std::chrono::high_resolution_clock::now();
+    return std::chrono::duration<double, std::milli>(end - start).count() / iterations;
+}
+
+template <typename T>
+double benchmark_openmp_blocked(T* A, T* B, T* C, size_t N, size_t block_size = 64, int num_threads = 0, int iterations = 10) {
+    for (int w = 0; w < 3; ++w) {
+        std::memset(C, 0, N * N * sizeof(T));
+        gemm_openmp_blocked(A, B, C, N, block_size, num_threads);
+    }
+
+    auto start = std::chrono::high_resolution_clock::now();
+    for (int i = 0; i < iterations; ++i) {
+        std::memset(C, 0, N * N * sizeof(T));
+        gemm_openmp_blocked(A, B, C, N, block_size, num_threads);
+    }
+    auto end = std::chrono::high_resolution_clock::now();
+    return std::chrono::duration<double, std::milli>(end - start).count() / iterations;
+}
+
+template <typename T>
+double benchmark_std_thread(T* A, T* B, T* C, size_t N, int num_threads = 0, int iterations = 10) {
+    for (int w = 0; w < 3; ++w) {
+        std::memset(C, 0, N * N * sizeof(T));
+        gemm_std_thread(A, B, C, N, num_threads);
+    }
+
+    auto start = std::chrono::high_resolution_clock::now();
+    for (int i = 0; i < iterations; ++i) {
+        std::memset(C, 0, N * N * sizeof(T));
+        gemm_std_thread(A, B, C, N, num_threads);
     }
     auto end = std::chrono::high_resolution_clock::now();
     return std::chrono::duration<double, std::milli>(end - start).count() / iterations;
@@ -71,31 +187,33 @@ int main(int argc, char* argv[]) {
         initialize_matrix(A, N);
         initialize_matrix(B, N);
 
-        double time = benchmark_function(gemm_naive<float>, A, B, C, N);
+        double time = benchmark_naive(A, B, C, N);
         print_results("naive", N, time);
 
-        time = benchmark_function_blocked(gemm_blocked<float>, A, B, C, N, 64);
+        time = benchmark_blocked(A, B, C, N, 64);
         print_results("blocked", N, time);
 
-        time = benchmark_function_blocked(gemm_cache_aware<float>, A, B, C, N, 32);
+        time = benchmark_cache_aware(A, B, C, N, 32);
         print_results("cache_aware", N, time);
 
-        time = benchmark_function(gemm_sse, A, B, C, N);
+        time = benchmark_sse(A, B, C, N);
         print_results("sse", N, time);
 
-        time = benchmark_function_blocked(gemm_avx2_blocked, A, B, C, N, 64);
+        time = benchmark_avx2(A, B, C, N, 64);
         print_results("avx2", N, time);
 
-        time = benchmark_function_blocked(gemm_avx512_blocked, A, B, C, N, 64);
+#ifdef __AVX512F__
+        time = benchmark_avx512(A, B, C, N, 64);
         print_results("avx512", N, time);
+#endif
 
-        time = benchmark_function(gemm_openmp<float>, A, B, C, N, num_threads);
+        time = benchmark_openmp(A, B, C, N, num_threads);
         print_results("openmp", N, time);
 
-        time = benchmark_function_blocked(gemm_openmp_blocked<float>, A, B, C, N, 64, num_threads);
+        time = benchmark_openmp_blocked(A, B, C, N, 64, num_threads);
         print_results("openmp_blocked", N, time);
 
-        time = benchmark_function(gemm_std_thread<float>, A, B, C, N, num_threads);
+        time = benchmark_std_thread(A, B, C, N, num_threads);
         print_results("std_thread", N, time);
 
         free(A);
