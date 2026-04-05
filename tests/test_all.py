@@ -13,6 +13,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 import config
 from src.python.numba import run_numba_benchmarks
 from src.python.numpy import run_numpy_benchmarks
+from src.python.strassen import run_strassen_benchmarks
 from src.cuda.tensor_core import run_tensor_core_benchmarks, is_tensor_core_available
 from src.python.sparse import run_sparse_benchmarks
 
@@ -82,9 +83,25 @@ def get_backend_label(algorithm: str, module: str = "") -> str:
     elif 'numpy' in alg_lower:
         return "CPU-Naive-NumPy-Python"
     elif 'sparse' in mod_lower or 'sparse' in alg_lower:
-        if 'gpu' in mod_lower or 'cuda' in alg_lower:
+        if 'gpu' in mod_lower or 'cuda' in mod_lower:
             return "GPU-Sparse-PyTorch-Python"
         return "CPU-Sparse-SciPy-Python"
+    elif 'strassen' in alg_lower:
+        if 'cublas' in alg_lower:
+            return "GPU-Strassen-cuBLAS-Cpp"
+        elif 'cuda' in alg_lower or 'custom' in alg_lower:
+            return "GPU-Strassen-CUDA-Cpp"
+        elif 'numpy' in alg_lower:
+            return "CPU-Strassen-NumPy-Python"
+        elif 'blocked' in alg_lower:
+            return "CPU-Strassen-Blocked-Cpp"
+        elif 'cache_aware' in alg_lower:
+            return "CPU-Strassen-CacheAware-Cpp"
+        elif 'naive' in alg_lower:
+            if mod_lower == 'python':
+                return "CPU-Strassen-Naive-Python"
+            return "CPU-Strassen-Naive-Cpp"
+        return "CPU-Strassen-Cpp"
     else:
         return "CPU-Naive-Cpp"
 
@@ -317,7 +334,7 @@ def test_sparse(sizes=None, backend="gpu"):
         try:
             r = run_sparse_benchmarks(
                 sizes=[size],
-                formats=config.SPARSE_FORMATS[:2],  # Just dense and CSR for speed
+                formats=config.SPARSE_FORMATS[:2],
                 sparsity=config.SPARSE_SPARSITY,
                 backend=backend
             )
@@ -330,6 +347,40 @@ def test_sparse(sizes=None, backend="gpu"):
                 print("FAILED")
         except Exception as e:
             print(f"ERROR: {str(e)[:50]}")
+    
+    return results
+
+
+def test_strassen_python(sizes=None, dtypes=None):
+    """Test Python Strassen implementations."""
+    print("\n[Module: Strassen Python]")
+    
+    if sizes is None:
+        sizes = config.QUICK_SIZES
+    if dtypes is None:
+        dtypes = ["fp32"]
+    
+    filtered_sizes = []
+    for size in sizes:
+        skip, reason = should_skip_size("strassen", size)
+        if skip:
+            print(f"  [N={size}] CPU-Strassen-Python -> Skipping ({reason})")
+        else:
+            filtered_sizes.append(size)
+    
+    if not filtered_sizes:
+        return []
+    
+    results = []
+    try:
+        r = run_strassen_benchmarks(sizes=filtered_sizes, dtypes=dtypes)
+        if r:
+            for res in r:
+                label = get_backend_label(res['algorithm'], res['module'])
+                print(f"  [N={res['size']}] {label} -> {res['gfops']:.2f} GFLOPS")
+                results.append(res)
+    except Exception as e:
+        print(f"  Strassen error: {str(e)[:50]}")
     
     return results
 
@@ -370,6 +421,7 @@ def test_all(
     run_gpu=True,
     run_cutlass=True,
     run_sparse=True,
+    run_strassen=True,
     sparse_backend="gpu",
     large_sizes=False
 ):
@@ -380,15 +432,11 @@ def test_all(
     print("GEMM BENCHMARK SUITE")
     print("=" * 60)
     
-    # For Python (NumPy/Numba): always use QUICK_SIZES (512 max) - too slow for larger
-    # For C++/GPU: use provided sizes or default to MEDIUM_SIZES
     if large_sizes:
         cpp_sizes = config.ALL_SIZES
-        python_sizes = config.QUICK_SIZES  # Still capped at 512 for Python
+        python_sizes = config.QUICK_SIZES
     else:
-        # Default sizes for binary execution (C++/GPU)
         cpp_sizes = sizes or config.MEDIUM_SIZES_CPP
-        # Python reference always uses QUICK_SIZES (too slow otherwise)
         python_sizes = config.QUICK_SIZES
     
     print(f"Matrix sizes (C++/GPU): {cpp_sizes}")
@@ -398,22 +446,20 @@ def test_all(
     
     all_results = []
     
-    # Reference (CPU NumPy/Numba) - uses Python sizes (capped at 512)
     all_results.extend(test_reference(python_sizes, dtypes))
     
-    # C++ CPU benchmarks
+    if run_strassen:
+        all_results.extend(test_strassen_python(python_sizes, dtypes))
+    
     if run_cpp:
         all_results.extend(test_cpp(cpp_sizes))
     
-    # GPU CUDA benchmarks
     if run_gpu:
         all_results.extend(test_gpu(cpp_sizes))
     
-    # CUTLASS Tensor Core benchmarks
     if run_cutlass:
         all_results.extend(test_cutlass(cpp_sizes, dtypes))
     
-    # Sparse matrix benchmarks
     if run_sparse:
         all_results.extend(test_sparse(backend=sparse_backend))
     
@@ -442,6 +488,7 @@ if __name__ == "__main__":
     parser.add_argument("--no-gpu", action="store_true", help="Skip GPU benchmarks")
     parser.add_argument("--no-cutlass", action="store_true", help="Skip CUTLASS/Tensor Core benchmarks")
     parser.add_argument("--no-sparse", action="store_true", help="Skip sparse benchmarks")
+    parser.add_argument("--no-strassen", action="store_true", help="Skip Strassen benchmarks")
     parser.add_argument("--sparse-backend", choices=["cpu", "gpu"], default="gpu",
                         help="Sparse benchmark backend")
     parser.add_argument("--large", action="store_true", help="Use large matrix sizes (up to 20000)")
@@ -466,6 +513,7 @@ if __name__ == "__main__":
         run_gpu=not args.no_gpu,
         run_cutlass=not args.no_cutlass,
         run_sparse=not args.no_sparse,
+        run_strassen=not args.no_strassen,
         sparse_backend=args.sparse_backend,
         large_sizes=args.large
     )

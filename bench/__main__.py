@@ -36,6 +36,7 @@ Examples:
     run_parser.add_argument("--no-gpu", action="store_true", help="Skip GPU benchmarks")
     run_parser.add_argument("--no-cutlass", action="store_true", help="Skip Tensor Core benchmarks")
     run_parser.add_argument("--no-sparse", action="store_true", help="Skip sparse benchmarks")
+    run_parser.add_argument("--no-strassen", action="store_true", help="Skip Strassen benchmarks")
     run_parser.add_argument("--sparse-backend", choices=["cpu", "gpu"], default="gpu", help="Sparse backend")
     
     # plot subcommand
@@ -76,6 +77,7 @@ Examples:
             run_gpu=not args.no_gpu,
             run_cutlass=not args.no_cutlass,
             run_sparse=not args.no_sparse,
+            run_strassen=not args.no_strassen,
             sparse_backend=args.sparse_backend
         )
         
