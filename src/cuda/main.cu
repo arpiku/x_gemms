@@ -7,6 +7,8 @@
 #include <cstdlib>
 #include "strassen_cublas.cu"
 #include "strassen_custom.cu"
+#include "winograd_cublas.cu"
+#include "winograd_custom.cu"
 
 __global__ void gemm_naive_kernel(const float* A, const float* B, float* C, int N) {
     int row = blockIdx.y * blockDim.y + threadIdx.y;
@@ -158,6 +160,12 @@ int main(int argc, char* argv[]) {
 
         time = benchmark_function(gemm_strassen_custom_wrapper, A, B, C, N);
         print_results("strassen_custom", N, time);
+
+        time = benchmark_function(gemm_winograd_cublas_wrapper, A, B, C, N);
+        print_results("winograd_cublas", N, time);
+
+        time = benchmark_function(gemm_winograd_custom_wrapper, A, B, C, N);
+        print_results("winograd_custom", N, time);
     }
 
     // Free matrices after all sizes are processed

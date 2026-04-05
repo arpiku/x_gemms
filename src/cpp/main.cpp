@@ -358,6 +358,12 @@ int main(int argc, char* argv[]) {
 
         time = benchmark_strassen_cache_aware(A, B, C, N, 64, 32);
         print_results("strassen_cache_aware", N, time);
+
+        time = benchmark_winograd_blocked(A, B, C, N, 64, 64);
+        print_results("winograd_blocked", N, time);
+
+        time = benchmark_winograd_cache_aware(A, B, C, N, 64, 32);
+        print_results("winograd_cache_aware", N, time);
     }
 
     // Free matrices after all sizes are processed

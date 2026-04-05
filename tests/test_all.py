@@ -14,6 +14,7 @@ import config
 from src.python.numba import run_numba_benchmarks
 from src.python.numpy import run_numpy_benchmarks
 from src.python.strassen import run_strassen_benchmarks
+from src.python.winograd import run_winograd_benchmarks
 from src.cuda.tensor_core import run_tensor_core_benchmarks, is_tensor_core_available
 from src.python.sparse import run_sparse_benchmarks
 
@@ -102,6 +103,18 @@ def get_backend_label(algorithm: str, module: str = "") -> str:
                 return "CPU-Strassen-Naive-Python"
             return "CPU-Strassen-Naive-Cpp"
         return "CPU-Strassen-Cpp"
+    elif 'winograd' in alg_lower:
+        if 'cublas' in alg_lower:
+            return "GPU-StrassenWinograd-cuBLAS-Cpp"
+        elif 'cuda' in alg_lower or 'custom' in alg_lower:
+            return "GPU-StrassenWinograd-CUDA-Cpp"
+        elif 'numpy' in alg_lower:
+            return "CPU-StrassenWinograd-NumPy-Python"
+        elif 'blocked' in alg_lower:
+            return "CPU-StrassenWinograd-Blocked-Cpp"
+        elif 'cache_aware' in alg_lower:
+            return "CPU-StrassenWinograd-CacheAware-Cpp"
+        return "CPU-StrassenWinograd-Cpp"
     else:
         return "CPU-Naive-Cpp"
 
@@ -407,6 +420,37 @@ def test_strassen_python(sizes=None, dtypes=None):
             print(f"  Strassen numpy error: {str(e)[:50]}")
     
     return results
+
+
+def test_winograd_python(sizes=None, dtypes=None):
+    """Test Python Winograd implementations."""
+    print("\n[Module: Winograd Python]")
+    
+    if sizes is None:
+        sizes = config.QUICK_SIZES
+    if dtypes is None:
+        dtypes = ["fp32"]
+    
+    results = []
+    
+    numpy_sizes = []
+    for size in sizes:
+        skip, reason = should_skip_size("winograd_numpy", size)
+        if skip:
+            print(f"  [N={size}] CPU-StrassenWinograd-NumPy-Python -> Skipping ({reason})")
+        else:
+            numpy_sizes.append(size)
+    
+    if numpy_sizes:
+        try:
+            r = run_winograd_benchmarks(sizes=numpy_sizes, dtypes=dtypes)
+            if r:
+                for res in r:
+                    label = get_backend_label(res['algorithm'], res['module'])
+                    print(f"  [N={res['size']}] {label} -> {res['gfops']:.2f} GFLOPS")
+                    results.append(res)
+        except Exception as e:
+            print(f"  Winograd numpy error: {str(e)[:50]}")
     
     return results
 
@@ -448,6 +492,7 @@ def test_all(
     run_cutlass=True,
     run_sparse=True,
     run_strassen=True,
+    run_winograd=True,
     sparse_backend="gpu",
     large_sizes=False
 ):
@@ -476,6 +521,9 @@ def test_all(
     
     if run_strassen:
         all_results.extend(test_strassen_python(python_sizes, dtypes))
+    
+    if run_winograd:
+        all_results.extend(test_winograd_python(python_sizes, dtypes))
     
     if run_cpp:
         all_results.extend(test_cpp(cpp_sizes))
@@ -515,6 +563,7 @@ if __name__ == "__main__":
     parser.add_argument("--no-cutlass", action="store_true", help="Skip CUTLASS/Tensor Core benchmarks")
     parser.add_argument("--no-sparse", action="store_true", help="Skip sparse benchmarks")
     parser.add_argument("--no-strassen", action="store_true", help="Skip Strassen benchmarks")
+    parser.add_argument("--no-winograd", action="store_true", help="Skip Winograd benchmarks")
     parser.add_argument("--sparse-backend", choices=["cpu", "gpu"], default="gpu",
                         help="Sparse benchmark backend")
     parser.add_argument("--large", action="store_true", help="Use large matrix sizes (up to 20000)")
@@ -540,6 +589,7 @@ if __name__ == "__main__":
         run_cutlass=not args.no_cutlass,
         run_sparse=not args.no_sparse,
         run_strassen=not args.no_strassen,
+        run_winograd=not args.no_winograd,
         sparse_backend=args.sparse_backend,
         large_sizes=args.large
     )
